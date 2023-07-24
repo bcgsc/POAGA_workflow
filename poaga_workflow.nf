@@ -1,5 +1,5 @@
 #!/usr/bin/env nextflow
-nextflow.preview.dsl=2
+nextflow.enable.dsl=2
 
 include {strandseq_concat_fastq} from './poaga_processes.nf'
 include {strandseq_cutadapt} from './poaga_processes.nf'
