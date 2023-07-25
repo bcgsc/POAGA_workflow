@@ -8,6 +8,8 @@ include {strandseq_tidy_reads} from './poaga_processes.nf'
 include {strandseq_mark_duplicates} from './poaga_processes.nf'
 include {strand_pass_fail_cells} from './poaga_processes.nf'
 include {ashleys_qc} from './poaga_processes.nf'
+include {strandseq_phase} from './poaga_processes.nf'
+include {patmat} from './poaga_processes.nf'
 
 /*
 * pipeline input parameters
@@ -34,7 +36,7 @@ workflow {
     input = Channel
         .fromPath(params.input_csv)
         .splitCsv(header:true)
-        .map{ row-> tuple(row.patient,row.strand_seq_fastq,row.clair3_vcf) }
+        .map{ row-> tuple(row.patient,row.strand_seq_fastq,row.clair3_vcf,row.bam) }
 
     strandseq(input)
 
@@ -42,8 +44,10 @@ workflow {
     ashleys_qc(input.join(strandseq.out.pass_strandseq_bam_folder))
 
     //strandseq_phase.R
+    strandseq_phase(input.join(ashleys_qc.out.ashleys_pass_folder))
 
-    //patmat.py
+    //patmat
+    patmat(input.join(strandseq_phase.out)
 
     //put patmat phased resuts into the bamå
 }
