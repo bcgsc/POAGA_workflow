@@ -16,7 +16,7 @@ include {patmat} from './poaga_processes.nf'
 */
 		
 params.input_csv = "/projects/rcorbettprj2/COVID19/ARTIC_V3"
-params.output_folder
+params.output_folder = "/projects/poaga/rcorbett_dev"
     
 log.info """\
 Run the POAGA pipeline using strand-seq and nanopore data
@@ -36,24 +36,34 @@ workflow {
     input = Channel
         .fromPath(params.input_csv)
         .splitCsv(header:true)
-        .map{ row-> tuple(row.patient,row.strand_seq_fastq,row.clair3_vcf,row.bam) }
+        .map{ row-> tuple(row.patient,row.strand_seq_fastq,row.clair3_vcf,row.bam,row.bai) }
 
+    //implemented below. Does the basic aligning, tidying and read count qc for strand-seq
     strandseq(input)
 
-    //ashley's qc
+    //ashley's qc - scores the cells, returns folders with the cells that pass and fail
     ashleys_qc(input.join(strandseq.out.pass_strandseq_bam_folder))
 
     //strandseq_phase.R
     strandseq_phase(input.join(ashleys_qc.out.ashleys_pass_folder))
 
     //patmat
-    patmat(input.join(strandseq_phase.out)
+    patmat(input.join(strandseq_phase.out), params.reference_genome)
 
-    //put patmat phased resuts into the bamå
+    //put patmat phased resuts into the bam
 }
 
+/*
+Takes care of the preliminary strand-seq analysis including:
+-making a single pair of fastq files per cell
+-align with bowtie2
+-sort, dupmark, etc.
+-Filter out cells with low fragment counts
 
-
+returns:
+-folders for cells that pass and fail
+-lists of cells that pass and fail
+*/
 workflow strandseq {
     take:
         input

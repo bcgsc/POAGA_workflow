@@ -10,14 +10,17 @@ binaries
 // phased the strandseq data with the clair3 vcf
 process strandseq_phase {
     tag "${patient}"
-    cpus 12
+    cpus 24
     memory "48 GB"
     container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
   
     input:
         tuple val(patient),
             path(strandseq_bam_folder),
-            path(clair_phased_vcf)
+            path(clair3_vcf),
+            path(bam),
+            path(bai),
+            path(ashleys_pass_bam_folder)
 
 	output:
         tuple val("${patient}"), path("phased/${patient}.strandseqphased.inv_aware.vcf")
@@ -26,13 +29,49 @@ process strandseq_phase {
 	"""
         /opt/PatMat-1.3.0/Strand-seq/strandseq_phase.R \
         -p TRUE \
-        -i ${strandseq_bam_folder} \
+        -i ${ashleys_pass_bam_folder} \
         -o phased \
-        -t 12 \
+        -t 24 \
         -n ${patient} \
-        ${clair_phased_vcf}
+        ${clair3_vcf}
     """
 }
+
+//Run vahid's patmat to predict which variants came from each parent
+process patmat {
+    tag "${patient}"
+    cpus 48
+    memory "48 GB"
+    container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
+    publishDir "${params.output_folder}/${patient}/", mode: 'copy'
+  
+    input:
+        tuple val(patient),
+            path(strandseq_bam_folder),
+            path(clair_phased_vcf),
+            path(bam),
+            path(bai),
+            path(strandseq_phased_vcf)
+        path(reference_genome)
+
+	output:
+        tuple val("${patient}"), path("patmat_out*")
+
+    script:
+	"""
+         python3 /opt/patmat.py \
+         -sv ${strandseq_phased_vcf}  \
+         -v ${clair_phased_vcf} \
+         -mc ${bam} \
+         -b  ${bam}  \
+         -ref ${reference_genome} \
+         -o patmat_out \
+         -p 48 \
+         -dp 10
+    """
+}
+
+
 
 process strandseq_concat_fastq {
     cpus 12
@@ -42,7 +81,9 @@ process strandseq_concat_fastq {
     input:
         tuple val(patient),
             path(strandseq_folder),
-            path(clair3_vcf)
+            path(clair3_vcf),
+            path(bam),
+            path(bai)
 
 	output:
         tuple val("${patient}"), path("merged_fastqs/*")
@@ -209,20 +250,31 @@ process ashleys_qc {
     input:
         tuple val(patient),
             path(strandseq_bam_folder),
-            path(clair_phased_vcf),
-            path(strandseq_bam_folder)
+            path(clair3_vcf),
+            path(bam),
+            path(bai),
+            path(strandseq_pass_bam_folder)
 
 	output:
         tuple val("${patient}"), path("quality.txt")
-
+        tuple val("${patient}"), path("ashleys_pass"), emit: ashleys_pass_folder
+        tuple val("${patient}"), path("ashleys_fail"), emit: ashleys_fail_folder
+        
     script:
 	"""
         ashleys.py -j 48 \
         features \
-        -f ${strandseq_bam_folder} \
+        -f ${strandseq_pass_bam_folder} \
         -w 5000000 2000000 1000000 800000 600000 400000 200000 \
         -o ./features.tsv
 
         ashleys.py predict -p ./features.tsv -o ./quality.txt -m /opt/ashleys-qc/models/svc_default.pkl
+
+        mkdir ashleys_pass
+        mkdir ashleys_fail
+
+        awk 'NR>1 && \$2==1{ print \$1 }' ./quality.txt | xargs -i cp ${strandseq_pass_bam_folder}/{} ${strandseq_pass_bam_folder}/{}.bai ashleys_pass
+        awk 'NR>1 && \$2==0{ print \$1 }' ./quality.txt | xargs -i cp ${strandseq_pass_bam_folder}/{} ${strandseq_pass_bam_folder}/{}.bai ashleys_fail
+        
     """
 }

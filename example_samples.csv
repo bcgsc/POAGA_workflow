@@ -1,0 +1,2 @@
+patient,strand_seq_fastq,clair3_vcf,bam,bai
+aaa-0255,/projects/poaga/external_strand_seq/Fastq_AAA_0255_Test,/projects/poaga/workflow/FNN031/IS_147_F128568/clair_3_0_1/clair_3_0_1_F128568/phased_merge_output.vcf.gz,/projects/poaga/workflow/FNN031/IS_147_F128568/bam/F128568_haplotagged.bam,/projects/poaga/workflow/FNN031/IS_147_F128568/bam/F128568_haplotagged.bam.bai
