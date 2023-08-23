@@ -10,9 +10,10 @@ binaries
 // phased the strandseq data with the clair3 vcf
 process strandseq_phase {
     tag "${patient}"
-    cpus 24
-    memory "48 GB"
+    cpus 48
+    memory "200 GB"
     container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
+    publishDir "${params.output_folder}/${patient}/", mode: 'copy'
   
     input:
         tuple val(patient),
@@ -23,14 +24,16 @@ process strandseq_phase {
             path(ashleys_pass_bam_folder)
 
 	output:
-        tuple val("${patient}"), path("phased/${patient}.strandseqphased.inv_aware.vcf")
+        tuple val("${patient}"), path("strandseq_phase/${patient}.strandseqphased.inv_aware.vcf"), emit: vcf
+        tuple val("${patient}"), path("strandseq_phase"), emit: strandseq_phase_all_output
+
 
     script:
 	"""
         /opt/PatMat-1.3.0/Strand-seq/strandseq_phase.R \
         -p TRUE \
         -i ${ashleys_pass_bam_folder} \
-        -o phased \
+        -o strandseq_phase \
         -t 24 \
         -n ${patient} \
         ${clair3_vcf}

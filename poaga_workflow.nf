@@ -48,7 +48,7 @@ workflow {
     strandseq_phase(input.join(ashleys_qc.out.ashleys_pass_folder))
 
     //patmat
-    patmat(input.join(strandseq_phase.out), params.reference_genome)
+    patmat(input.join(strandseq_phase.out.vcf), params.reference_genome)
 
     //put patmat phased resuts into the bam
 }
@@ -86,6 +86,7 @@ workflow strandseq {
         strandseq_mark_duplicates(strandseq_tidy_reads.out)
 
         //split bams into pass/fail sets
+        //strandseq_mark_duplicates.out.groupTuple().view()
         strand_pass_fail_cells(strandseq_mark_duplicates.out.groupTuple())
 
     emit:
