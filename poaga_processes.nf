@@ -108,7 +108,7 @@ process strandseq_concat_fastq {
 process strandseq_cutadapt {
     cpus 12
     memory "48 GB"
-    container "https://depot.galaxyproject.org/singularity/cutadapt%3A2.6--py37h516909a_0"
+    container "quay.io/biocontainers/cutadapt:2.6--py36h516909a_0"
   
     input:
         tuple val(patient),
@@ -141,7 +141,7 @@ process strandseq_cutadapt {
 process strandseq_bowtie {
     cpus 12
     memory "12 GB"
-    container "https://depot.galaxyproject.org/singularity/bowtie2%3A2.3.5.1--py37he513fc3_0"
+    container "quay.io/biocontainers/bowtie2:2.3.5.1--py27he513fc3_0"
   
     input:
         tuple val(patient),
@@ -163,7 +163,7 @@ process strandseq_bowtie {
 process strandseq_tidy_reads {
     cpus 2
     memory "12 GB"
-    container "https://depot.galaxyproject.org/singularity/samtools%3A1.17--hd87286a_1"
+    container "quay.io/biocontainers/samtools:1.17--hd87286a_1"
   
     input:
         tuple val(patient),
@@ -190,7 +190,7 @@ process strandseq_tidy_reads {
 process strandseq_mark_duplicates {
     cpus 12
     memory "12 GB"
-    container "https://depot.galaxyproject.org/singularity/picard%3A2.26.10--hdfd78af_0"
+    container "quay.io/biocontainers/picard:2.26.10--hdfd78af_0"
   
     input:
         tuple val(patient),
@@ -209,7 +209,7 @@ process strandseq_mark_duplicates {
 process strand_pass_fail_cells {
     cpus 12
     memory "12 GB"
-    container "https://depot.galaxyproject.org/singularity/sambamba%3A1.0--h98b6b92_0"
+    container "quay.io/biocontainers/sambamba:1.0--h98b6b92_0"
     publishDir "${params.output_folder}/${patient}/", mode: 'copy'
   
     input:
