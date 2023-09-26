@@ -10,8 +10,8 @@ binaries
 // phased the strandseq data with the clair3 vcf
 process strandseq_phase {
     tag "${patient}"
-    cpus 48
-    memory "200 GB"
+    cpus 12
+    memory "400 GB"
     container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
     publishDir "${params.output_folder}/${patient}/", mode: 'copy'
   
@@ -34,7 +34,7 @@ process strandseq_phase {
         -p TRUE \
         -i ${ashleys_pass_bam_folder} \
         -o strandseq_phase \
-        -t 24 \
+        -t 12 \
         -n ${patient} \
         ${clair3_vcf}
     """
@@ -44,7 +44,7 @@ process strandseq_phase {
 process patmat {
     tag "${patient}"
     cpus 48
-    memory "48 GB"
+    memory "360 GB"
     container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
     publishDir "${params.output_folder}/${patient}/", mode: 'copy'
   
@@ -70,7 +70,7 @@ process patmat {
          -ref ${reference_genome} \
          -o patmat_out \
          -p 48 \
-         -dp 10
+         -dp 6
     """
 }
 
