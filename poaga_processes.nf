@@ -215,6 +215,7 @@ process strand_pass_fail_cells {
     input:
         tuple val(patient),
            path(bam_files)
+        val(min_reads_threshold)
 
 	output:
         tuple val("${patient}"), path("pass.strandseq.files.txt"), emit: passed_strand_seq_list
@@ -230,8 +231,8 @@ process strand_pass_fail_cells {
 
         ls *bam | xargs -i echo "sambamba flagstat {} > {}.flagstat" | bash 
 
-        grep -H total *.flagstat | awk '{ print \$1 }' | awk -F ":" '\$2>10000 { print \$1 }' | sed 's/.flagstat//' > pass.strandseq.files.txt
-        grep -H total *.flagstat | awk '{ print \$1 }' | awk -F ":" '\$2<=10000 { print \$1 }' | sed 's/.flagstat//' > fail.strandseq.files.txt
+        grep -H total *.flagstat | awk '{ print \$1 }' | awk -F ":" '\$2>$min_reads_threshold { print \$1 }' | sed 's/.flagstat//' > pass.strandseq.files.txt
+        grep -H total *.flagstat | awk '{ print \$1 }' | awk -F ":" '\$2<=$min_reads_threshold { print \$1 }' | sed 's/.flagstat//' > fail.strandseq.files.txt
 
         cat pass.strandseq.files.txt | xargs -i cp {} pass_strandseq_bams
         cat fail.strandseq.files.txt | xargs -i cp {} fail_strandseq_bams
