@@ -58,7 +58,7 @@ process patmat {
         path(reference_genome)
 
 	output:
-        tuple val("${patient}"), path("patmat_out*")
+        tuple val("${patient}"), path("patmat_out*"), path("snp_identity_check.txt")
 
     script:
 	"""
@@ -70,9 +70,13 @@ process patmat {
          -ref ${reference_genome} \
          -o patmat_out \
          -p 48 \
-         -dp 6
+         -dp 6 | tee stdout
+
+         # Parse the SNP identity line:
+         grep "reference heterozygous phased" stdout > snp_identity_check.txt
     """
 }
+
 
 
 
