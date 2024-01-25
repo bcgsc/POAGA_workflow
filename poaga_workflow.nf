@@ -11,7 +11,13 @@ include {ashleys_qc} from './poaga_processes.nf'
 include {strandseq_phase} from './poaga_processes.nf'
 include {patmat} from './poaga_processes.nf'
 
-    
+if (!params.input_csv) {
+    error("Error: Please specify the input CSV file with the --input_csv parameter.")
+}
+if (!params.output_folder) {
+    error("Error: Please specify the output location with the --output_folder parameter.")
+}
+
 log.info """\
 Run the POAGA pipeline using strand-seq and nanopore data
 ===================================
