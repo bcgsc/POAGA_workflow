@@ -22,6 +22,7 @@ process strandseq_phase {
             path(bam),
             path(bai),
             path(ashleys_pass_bam_folder)
+        val(chromosomes)
 
 	output:
         tuple val("${patient}"), path("strandseq_phase/${patient}.strandseqphased.inv_aware.vcf"), emit: vcf
@@ -36,6 +37,7 @@ process strandseq_phase {
         -o strandseq_phase \
         -t 12 \
         -n ${patient} \
+        --chromosomes ${chromosomes} \
         ${clair3_vcf}
     """
 }
