@@ -42,7 +42,7 @@ workflow {
     strandseq(input)
 
     //ashley's qc - scores the cells, returns folders with the cells that pass and fail
-    ashleys_qc(input.join(strandseq.out.pass_strandseq_bam_folder))
+    ashleys_qc(input.join(strandseq.out.pass_strandseq_bam_folder), params.min_ashleys_qc_prob)
 
     //strandseq_phase.R
     strandseq_phase(input.join(ashleys_qc.out.ashleys_pass_folder), params.chromosomes)
