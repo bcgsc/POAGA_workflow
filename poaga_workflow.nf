@@ -11,13 +11,13 @@ include {ashleys_qc} from './poaga_processes.nf'
 include {strandseq_phase} from './poaga_processes.nf'
 include {patmat} from './poaga_processes.nf'
 
-/*
-* pipeline input parameters
-*/
-		
-params.input_csv = "/projects/rcorbettprj2/COVID19/ARTIC_V3"
-params.output_folder = "/projects/poaga/rcorbett_dev"
-    
+if (!params.input_csv) {
+    error("Error: Please specify the input CSV file with the --input_csv parameter.")
+}
+if (!params.output_folder) {
+    error("Error: Please specify the output location with the --output_folder parameter.")
+}
+
 log.info """\
 Run the POAGA pipeline using strand-seq and nanopore data
 ===================================
@@ -87,7 +87,7 @@ workflow strandseq {
 
         //split bams into pass/fail sets
         //strandseq_mark_duplicates.out.groupTuple().view()
-        strand_pass_fail_cells(strandseq_mark_duplicates.out.groupTuple())
+        strand_pass_fail_cells(strandseq_mark_duplicates.out.groupTuple(), params.min_reads_threshold)
 
     emit:
         passed_strand_seq_list = strand_pass_fail_cells.out.passed_strand_seq_list
