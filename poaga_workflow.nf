@@ -45,7 +45,7 @@ workflow {
     ashleys_qc(input.join(strandseq.out.pass_strandseq_bam_folder))
 
     //strandseq_phase.R
-    strandseq_phase(input.join(ashleys_qc.out.ashleys_pass_folder))
+    strandseq_phase(input.join(ashleys_qc.out.ashleys_pass_folder), params.chromosomes)
 
     //patmat
     patmat(input.join(strandseq_phase.out.vcf), params.reference_genome)
