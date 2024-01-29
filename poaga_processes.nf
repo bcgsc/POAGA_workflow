@@ -60,7 +60,8 @@ process patmat {
         path(reference_genome)
 
 	output:
-        tuple val("${patient}"), path("patmat_out*"), path("snp_identity_check.txt")
+        tuple val("${patient}"), path("patmat_out*"), path("snp_identity_check.txt"), emit: patmat_all_output
+        tuple val("${patient}"), path("patmat_out_PofO_Assignment.vcf"), emit: pofo_assignment_vcf
 
     script:
 	"""
@@ -79,6 +80,31 @@ process patmat {
     """
 }
 
+process haplotag {
+    tag "${patient}"
+    cpus 48
+    memory "48 GB"
+    // container "quay.io/biocontainers/whatshap:2.2--py310h0dbaff4_0"
+    publishDir "${params.output_folder}/${patient}/", mode: 'copy'
+  
+    input:
+        tuple val(patient),
+            path(strandseq_fastq),
+            path(clair_vcf),
+            path(bam),
+            path(bai),
+            path(pofo_assignment_vcf)
+        path(reference_genome)
+        path(reference_genome_idx)
+
+	output:
+        tuple val("${patient}"), path("PofO_HaploTagged.sorted.bam"), path("PofO_HaploTagged.sorted.bam.bai"), emit: haplotagged_bam
+
+    script:
+	"""
+        bam_happlotagging.sh $pofo_assignment_vcf $bam $reference_genome 48
+    """
+}
 
 
 
