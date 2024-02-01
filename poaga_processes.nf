@@ -264,6 +264,7 @@ process ashleys_qc {
             path(bam),
             path(bai),
             path(strandseq_pass_bam_folder)
+        val(pass_probability)
 
 	output:
         tuple val("${patient}"), path("quality.txt")
@@ -272,19 +273,6 @@ process ashleys_qc {
         
     script:
 	"""
-        ashleys.py -j 48 \
-        features \
-        -f ${strandseq_pass_bam_folder} \
-        -w 5000000 2000000 1000000 800000 600000 400000 200000 \
-        -o ./features.tsv
-
-        ashleys.py predict -p ./features.tsv -o ./quality.txt -m /opt/ashleys-qc/models/svc_default.pkl
-
-        mkdir ashleys_pass
-        mkdir ashleys_fail
-
-        awk 'NR>1 && \$2==1{ print \$1 }' ./quality.txt | xargs -i cp ${strandseq_pass_bam_folder}/{} ${strandseq_pass_bam_folder}/{}.bai ashleys_pass
-        awk 'NR>1 && \$2==0{ print \$1 }' ./quality.txt | xargs -i cp ${strandseq_pass_bam_folder}/{} ${strandseq_pass_bam_folder}/{}.bai ashleys_fail
-        
+        ashleys_qc.sh ${strandseq_pass_bam_folder} ${pass_probability}
     """
 }
