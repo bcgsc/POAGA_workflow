@@ -35,7 +35,7 @@ process strandseq_phase {
         -p TRUE \
         -i ${ashleys_pass_bam_folder} \
         -o strandseq_phase \
-        -t 12 \
+        -t ${task.cpus} \
         -n ${patient} \
         --chromosomes ${chromosomes} \
         ${clair3_vcf}
@@ -71,7 +71,7 @@ process patmat {
          -b  ${bam}  \
          -ref ${reference_genome} \
          -o patmat_out \
-         -p 48 \
+         -p ${task.cpus} \
          -dp 6 | tee stdout
 
          # Parse the SNP identity line:
@@ -161,7 +161,7 @@ process strandseq_bowtie {
     //had to use a folder for the reference and give the name here to get it available in the container 
     script:
 	"""	
-        bowtie2 -x ${bowtie_ref}/hg38_no_alt -p 12 -1 ${fastq1} -2 ${fastq2} -S ${fastq1.simpleName}.sam
+        bowtie2 -x ${bowtie_ref}/hg38_no_alt -p ${task.cpus} -1 ${fastq1} -2 ${fastq2} -S ${fastq1.simpleName}.sam
     """
 }
 
@@ -273,6 +273,6 @@ process ashleys_qc {
         
     script:
 	"""
-        ashleys_qc.sh ${strandseq_pass_bam_folder} ${pass_probability}
+        ashleys_qc.sh ${strandseq_pass_bam_folder} ${pass_probability} ${task.cpus}
     """
 }
