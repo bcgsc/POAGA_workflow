@@ -11,12 +11,57 @@ include {ashleys_qc} from './poaga_processes.nf'
 include {strandseq_phase} from './poaga_processes.nf'
 include {patmat} from './poaga_processes.nf'
 
+
+// HELP message
+if ( params.help ) {
+    help = """
+             |poaga_processes.nf: Parent of Origin (POAGA) pipeline using strand-seq and nanopore data.
+             |
+             |Usage: nextflow run poaga_processes.nf --input_csv <CSV> --output_folder <DIR>
+             |
+             |Required arguments:
+             |  --input_csv             Location of the input CSV file. Each row corresponds to a sample to be processed.
+             |                          The CSV file must have a header with 5 columns:
+             |     - patient            Sample label.
+             |     - strand_seq_fastq   Folder with the Strand-seq FastQ files for the sample.
+             |     - clair3_vcf         Clair3 VCF output for the sample's Nanopore data.
+             |     - bam                Nanopore BAM file.
+             |     - bai                Index file for the Nanopore BAM file.
+             |
+             |  --output_folder         Output folder to store POAGA results.
+             |
+             |Optional arguments:
+             |  --min_reads_threshold   Minimum number of high quality reads to pass a StrandSeq library file.
+             |                [default: ${params.min_reads_threshold}]
+             |  --chromosomes           Comma-separated list of chromosomes to process.
+             |                [default: ${params.chromosomes}]
+             |  --min_ashleys_qc_prob   Minimum probability score for a Strand-seq library to pass the ASHLEYS QC step.
+             |                [default: ${params.min_ashleys_qc_prob}]
+             |  -w                      The NextFlow work directory. 
+             |                [default: ${workDir}]
+             |  -profile                Nextflow config profile(s) with pre-defined parameters (comma-separated profiles to use more than one). 
+             |                Available profiles include 'hg38_no_alt' (hg38 reference genome) and 'test' (run minimal dataset test)
+             |
+             |Useful Nextflow arguments:
+             |  -resume                Does not execute steps that have already been executed with the same parameters. Useful for resuming
+             |                         failed runs or re-runs with some parameter changes.
+             |  -with-report           Creates an HTML report with many nextflow execution metrics.
+             |  -with-trace            Creates a tab-separated file with time, cpu and memory stats of each process.
+             |  -with-timeline         Creates an HTML execution timeline of the pipeline
+             |""".stripMargin()
+
+    // Print the help with the stripped margin and exit
+    println(help)
+    exit(0)
+}
+
 if (!params.input_csv) {
     error("Error: Please specify the input CSV file with the --input_csv parameter.")
 }
 if (!params.output_folder) {
     error("Error: Please specify the output location with the --output_folder parameter.")
 }
+
 
 log.info """\
 Run the POAGA pipeline using strand-seq and nanopore data
