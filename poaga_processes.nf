@@ -163,7 +163,7 @@ process whatshap_haplotag {
         cat <<-END_VERSIONS > ${task.process}.versions.log
         Process:"${task.process}"
         Container: "${task.container}"
-        whatshap: \$ ( whatshap --version )
+        whatshap: \$( whatshap --version )
         END_VERSIONS
     """
 }
@@ -275,7 +275,7 @@ process strandseq_cutadapt {
         cat <<-END_VERSIONS > ${task.process}.versions.log
         Process:"${task.process}"
         Container: "${task.container}"
-        cutadapt: \$ ( cutadapt --version )
+        cutadapt: \$( cutadapt --version )
         END_VERSIONS
     """
 }
