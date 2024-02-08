@@ -128,20 +128,20 @@ workflow strandseq {
        
         //will process each fastq pair as its own job
         //strandseq_concat_fastq.out.transpose().view()
-        strandseq_cutadapt(strandseq_concat_fastq.out.transpose())
+        strandseq_cutadapt(strandseq_concat_fastq.out.fastqs.transpose())
 
         //bowtie2 - outputs sam
-        strandseq_bowtie(strandseq_cutadapt.out, params.bowtie_index)
+        strandseq_bowtie(strandseq_cutadapt.out.fastqs, params.bowtie_index)
 
         //tidybam
-        strandseq_tidy_reads(strandseq_bowtie.out)
+        strandseq_tidy_reads(strandseq_bowtie.out.sam_file)
         
         //remove bams with very few reads
-        strandseq_mark_duplicates(strandseq_tidy_reads.out)
+        strandseq_mark_duplicates(strandseq_tidy_reads.out.bam_file)
 
         //split bams into pass/fail sets
         //strandseq_mark_duplicates.out.groupTuple().view()
-        strand_pass_fail_cells(strandseq_mark_duplicates.out.groupTuple(), params.min_reads_threshold)
+        strand_pass_fail_cells(strandseq_mark_duplicates.out.bam_file.groupTuple(), params.min_reads_threshold)
 
     emit:
         passed_strand_seq_list = strand_pass_fail_cells.out.passed_strand_seq_list
