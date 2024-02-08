@@ -10,7 +10,9 @@ include {strand_pass_fail_cells} from './poaga_processes.nf'
 include {ashleys_qc} from './poaga_processes.nf'
 include {strandseq_phase} from './poaga_processes.nf'
 include {patmat} from './poaga_processes.nf'
-include {haplotag} from './poaga_processes.nf'
+include {prepare_whatshap_files} from './poaga_processes.nf'
+include {whatshap_haplotag} from './poaga_processes.nf'
+include {sort_haplotagged_bam} from './poaga_processes.nf'
 
 
 // HELP message
@@ -96,8 +98,11 @@ workflow {
     //patmat
     patmat(input.join(strandseq_phase.out.vcf), params.reference_genome)
 
-    //put patmat phased resuts into the bam
-    haplotag(input.join(patmat.out.pofo_assignment_vcf), params.reference_genome, params.reference_genome_idx)
+    //Haplotagging the BAM file with whatshap
+    prepare_whatshap_files(input.join(patmat.out.pofo_assignment_vcf)) 
+    whatshap_haplotag(prepare_whatshap_files.out.prep_files, params.reference_genome, params.reference_genome_idx)
+    sort_haplotagged_bam(whatshap_haplotag.out.haplotagged_bam)
+
 
 
 }
