@@ -13,7 +13,7 @@ _print_help() {
   cat <<HEREDOC
 Runs ASHLEYS (https://github.com/friendsofstrandseq/ashleys-qc) to select high quality strandseq libraries.
 Usage:
-  ${_ME} BAM_FOLDER PASS_PROBABILITY
+  ${_ME} BAM_FOLDER PASS_PROBABILITY THREADS
   ${_ME} -h | --help
 
 Options:
@@ -24,8 +24,9 @@ HEREDOC
 _run_ashleys() {
   BAM_FOLDER=$1
   PASS_PROBABILITY=$2
+  THREADS=$3
 
-  ashleys.py -j 48 \
+  ashleys.py -j $THREADS \
   features \
   -f $BAM_FOLDER \
   -w 5000000 2000000 1000000 800000 600000 400000 200000 \
@@ -41,7 +42,7 @@ _run_ashleys() {
 
 }
 _main() {
-  if [[ "${1:-}" =~ ^-h|--help$ || $# != 2 ]]  # Asked for help or passed wrong number of parameters
+  if [[ "${1:-}" =~ ^-h|--help$ || $# != 3 ]]  # Asked for help or passed wrong number of parameters
   then
     _print_help
   else
