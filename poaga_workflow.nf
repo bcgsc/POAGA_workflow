@@ -74,6 +74,7 @@ samples_file        : ${params.input_csv}
 """
 .stripIndent()
 
+
 /*
 * Main workflow
 */
@@ -88,24 +89,34 @@ workflow {
 
     //implemented below. Does the basic aligning, tidying and read count qc for strand-seq
     strandseq(input)
+    ch_versions = strandseq.out.ch_versions
 
     //ashley's qc - scores the cells, returns folders with the cells that pass and fail
     ashleys_qc(input.join(strandseq.out.pass_strandseq_bam_folder), params.min_ashleys_qc_prob)
+    ch_versions = ch_versions.mix(ashleys_qc.out.versions.take(1))
 
     //strandseq_phase.R
     strandseq_phase(input.join(ashleys_qc.out.ashleys_pass_folder), params.chromosomes)
+    ch_versions = ch_versions.mix(strandseq_phase.out.versions.take(1))
 
     //patmat
     patmat(input.join(strandseq_phase.out.vcf), params.reference_genome)
+    ch_versions = ch_versions.mix(patmat.out.versions.take(1))
 
     //Haplotagging the BAM file with whatshap
     prepare_whatshap_files(input.join(patmat.out.pofo_assignment_vcf)) 
+    ch_versions = ch_versions.mix(prepare_whatshap_files.out.versions.take(1))
+
     whatshap_haplotag(prepare_whatshap_files.out.prep_files, params.reference_genome, params.reference_genome_idx)
+    ch_versions = ch_versions.mix(whatshap_haplotag.out.versions.take(1))
+
     sort_haplotagged_bam(whatshap_haplotag.out.haplotagged_bam)
+    ch_versions = ch_versions.mix(sort_haplotagged_bam.out.versions.take(1))
 
-
-
+    // Merge and publish logs
+    ch_versions.unique().collectFile(name: params.logfile, storeDir: params.output_folder)
 }
+
 
 /*
 Takes care of the preliminary strand-seq analysis including:
@@ -123,30 +134,37 @@ workflow strandseq {
         input
 
     main:
+        ch_versions = Channel.empty()
+
         //concat_fastq
         strandseq_concat_fastq(input)
-       
+        ch_versions = ch_versions.mix(strandseq_concat_fastq.out.versions.take(1))
+
         //will process each fastq pair as its own job
-        //strandseq_concat_fastq.out.transpose().view()
         strandseq_cutadapt(strandseq_concat_fastq.out.fastqs.transpose())
+        ch_versions = ch_versions.mix(strandseq_cutadapt.out.versions.take(1))
 
         //bowtie2 - outputs sam
         strandseq_bowtie(strandseq_cutadapt.out.fastqs, params.bowtie_index)
+        ch_versions = ch_versions.mix(strandseq_bowtie.out.versions.take(1))
 
         //tidybam
         strandseq_tidy_reads(strandseq_bowtie.out.sam_file)
+        ch_versions = ch_versions.mix(strandseq_tidy_reads.out.versions.take(1))
         
         //remove bams with very few reads
         strandseq_mark_duplicates(strandseq_tidy_reads.out.bam_file)
+        ch_versions = ch_versions.mix(strandseq_mark_duplicates.out.versions.take(1))
 
         //split bams into pass/fail sets
-        //strandseq_mark_duplicates.out.groupTuple().view()
         strand_pass_fail_cells(strandseq_mark_duplicates.out.bam_file.groupTuple(), params.min_reads_threshold)
+        ch_versions = ch_versions.mix(strand_pass_fail_cells.out.versions.take(1))
 
     emit:
         passed_strand_seq_list = strand_pass_fail_cells.out.passed_strand_seq_list
         failed_strand_seq_list = strand_pass_fail_cells.out.failed_strand_seq_list
         pass_strandseq_bam_folder = strand_pass_fail_cells.out.pass_strandseq_bams
         fail_strandseq_bam_folder = strand_pass_fail_cells.out.fail_strandseq_bams
+        ch_versions
 
 }
