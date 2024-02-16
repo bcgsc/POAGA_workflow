@@ -58,7 +58,6 @@ process patmat {
     memory "360 GB"
     container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
     publishDir "${params.output_folder}/${patient}/", mode: 'copy', pattern: 'patmat'
-    publishDir "${params.output_folder}/${patient}/logs/", mode: 'copy', pattern: "${task.process}.versions.log"
 
     input:
         tuple val(patient),
@@ -106,7 +105,6 @@ process prepare_whatshap_files {
     cpus 48
     memory "48 GB"
     container "quay.io/biocontainers/samtools:1.19.2--h50ea8bc_0"
-    publishDir "${params.output_folder}/${patient}/logs/", mode: 'copy', pattern: "${task.process}.versions.log"
 
     input:
         tuple val(patient),
@@ -140,7 +138,6 @@ process whatshap_haplotag {
     cpus 48
     memory "48 GB"
     container "quay.io/biocontainers/whatshap:2.2--py310h0dbaff4_0"
-    publishDir "${params.output_folder}/${patient}/logs/", mode: 'copy', pattern: "${task.process}.versions.log"
 
     input:
         tuple val(patient),
@@ -177,7 +174,6 @@ process sort_haplotagged_bam {
     memory "48 GB"
     container "quay.io/biocontainers/samtools:1.19.2--h50ea8bc_0"
     publishDir "${params.output_folder}/${patient}/", mode: 'copy', pattern: 'PofO_HaploTagged.sorted.bam*'
-    publishDir "${params.output_folder}/${patient}/logs/", mode: 'copy', pattern: "${task.process}.versions.log"
 
     input:
         tuple val(patient),
@@ -209,7 +205,6 @@ process strandseq_concat_fastq {
     cpus 12
     memory "48 GB"
     container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
-    publishDir "${params.output_folder}/${patient}/logs/", mode: 'copy', pattern: "${task.process}.versions.log"
   
     input:
         tuple val(patient),
@@ -246,7 +241,6 @@ process strandseq_cutadapt {
     cpus 12
     memory "48 GB"
     container "quay.io/biocontainers/cutadapt:2.6--py36h516909a_0"
-    publishDir "${params.output_folder}/${patient}/logs/", mode: 'copy', pattern: "${task.process}.versions.log"
   
     input:
         tuple val(patient),
@@ -289,7 +283,6 @@ process strandseq_bowtie {
     cpus 12
     memory "12 GB"
     container "quay.io/biocontainers/bowtie2:2.3.5.1--py27he513fc3_0"
-    publishDir "${params.output_folder}/${patient}/logs/", mode: 'copy', pattern: "${task.process}.versions.log"
   
     input:
         tuple val(patient),
@@ -322,7 +315,6 @@ process strandseq_tidy_reads {
     cpus 2
     memory "12 GB"
     container "quay.io/biocontainers/samtools:1.17--hd87286a_1"
-    publishDir "${params.output_folder}/${patient}/logs/", mode: 'copy', pattern: "${task.process}.versions.log"
   
     input:
         tuple val(patient),
@@ -359,7 +351,6 @@ process strandseq_mark_duplicates {
     cpus 12
     memory "12 GB"
     container "quay.io/biocontainers/picard:2.26.10--hdfd78af_0"
-    publishDir "${params.output_folder}/${patient}/logs/", mode: 'copy', pattern: "${task.process}.versions.log"
   
     input:
         tuple val(patient),
@@ -389,7 +380,6 @@ process strand_pass_fail_cells {
     memory "12 GB"
     container "quay.io/biocontainers/sambamba:1.0--h98b6b92_0"
     publishDir "${params.output_folder}/${patient}/", mode: 'copy', pattern: "{pass_strandseq_bams,fail_strandseq_bams}"
-    publishDir "${params.output_folder}/${patient}/logs/", mode: 'copy', pattern: "${task.process}.versions.log"
   
     input:
         tuple val(patient),
@@ -439,7 +429,6 @@ process ashleys_qc {
     memory "48 GB"
     container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
     publishDir "${params.output_folder}/${patient}/ashleys_qc", mode: 'copy', pattern: '{ashleys_fail,ashleys_pass,quality.txt}'
-    publishDir "${params.output_folder}/${patient}/logs/", mode: 'copy', pattern: "${task.process}.versions.log"
   
     input:
         tuple val(patient),
