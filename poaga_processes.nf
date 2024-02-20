@@ -13,7 +13,8 @@ process strandseq_phase {
     cpus 12
     memory "400 GB"
     container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
-    publishDir "${params.output_folder}/${patient}", mode: 'copy', pattern: "strandseq_phase"
+    publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "${patient}.strandseqphased.inv_aware.vcf"
+    publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "*", enabled: params.debug
   
     input:
         tuple val(patient),
@@ -25,8 +26,8 @@ process strandseq_phase {
         val(chromosomes)
 
 	output:
-        tuple val("${patient}"), path("strandseq_phase/${patient}.strandseqphased.inv_aware.vcf"), emit: vcf
-        tuple val("${patient}"), path("strandseq_phase"), emit: strandseq_phase_all_output
+        tuple val("${patient}"), path("${patient}.strandseqphased.inv_aware.vcf"), emit: vcf
+        tuple val("${patient}"), path("*"), emit: strandseq_phase_all_output
         path("versions.yml"), emit: versions
 
     script:
@@ -35,7 +36,7 @@ process strandseq_phase {
         /opt/PatMat-1.3.0/Strand-seq/strandseq_phase.R \
         -p TRUE \
         -i ${ashleys_pass_bam_folder} \
-        -o strandseq_phase \
+        -o . \
         -t ${task.cpus} \
         -n ${patient} \
         --chromosomes ${chromosomes} \
@@ -57,7 +58,11 @@ process patmat {
     cpus 48
     memory "360 GB"
     container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
-    publishDir "${params.output_folder}/${patient}/", mode: 'copy', pattern: 'patmat'
+    publishDir "${params.output_folder}/${patient}/patmat", mode: 'copy', pattern: '*', enabled: params.debug
+    publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Assignment.vcf'
+    publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Scores.tsv'
+    publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'snp_identity_check.txt'
+    
 
     input:
         tuple val(patient),
@@ -69,20 +74,19 @@ process patmat {
         path(reference_genome)
 
 	output:
-        tuple val("${patient}"), path("patmat"), path("snp_identity_check.txt"), emit: patmat_all_output
-        tuple val("${patient}"), path("patmat/patmat_PofO_Assignment.vcf"), emit: pofo_assignment_vcf
+        tuple val("${patient}"), path("*"), emit: patmat_all_output
+        tuple val("${patient}"), path("patmat_PofO_Assignment.vcf"), emit: pofo_assignment_vcf
         path("versions.yml"), emit: versions
 
     script:
 	"""
-        mkdir -p patmat
          python3 /opt/patmat.py \
          -sv ${strandseq_phased_vcf}  \
          -v ${clair_phased_vcf} \
          -mc ${bam} \
          -b  ${bam}  \
          -ref ${reference_genome} \
-         -o "patmat/patmat" \
+         -o "patmat" \
          -p ${task.cpus} \
          -dp 6 | tee stdout
 
@@ -173,7 +177,7 @@ process sort_haplotagged_bam {
     cpus 48
     memory "48 GB"
     container "quay.io/biocontainers/samtools:1.19.2--h50ea8bc_0"
-    publishDir "${params.output_folder}/${patient}/", mode: 'copy', pattern: 'PofO_HaploTagged.sorted.bam*'
+    publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'PofO_HaploTagged.sorted.bam*'
 
     input:
         tuple val(patient),
@@ -379,7 +383,6 @@ process strand_pass_fail_cells {
     cpus 12
     memory "12 GB"
     container "quay.io/biocontainers/sambamba:1.0--h98b6b92_0"
-    publishDir "${params.output_folder}/${patient}/", mode: 'copy', pattern: "{pass_strandseq_bams,fail_strandseq_bams}"
   
     input:
         tuple val(patient),
@@ -428,7 +431,7 @@ process ashleys_qc {
     cpus 48
     memory "48 GB"
     container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
-    publishDir "${params.output_folder}/${patient}/ashleys_qc", mode: 'copy', pattern: '{ashleys_fail,ashleys_pass,quality.txt}'
+    publishDir "${params.output_folder}/${patient}/ashleys_qc", mode: 'copy', pattern: '{fail,pass,quality.txt}'
   
     input:
         tuple val(patient),
@@ -441,8 +444,8 @@ process ashleys_qc {
 
 	output:
         tuple val("${patient}"), path("quality.txt")
-        tuple val("${patient}"), path("ashleys_pass"), emit: ashleys_pass_folder
-        tuple val("${patient}"), path("ashleys_fail"), emit: ashleys_fail_folder
+        tuple val("${patient}"), path("pass"), emit: ashleys_pass_folder
+        tuple val("${patient}"), path("fail"), emit: ashleys_fail_folder
         path("versions.yml"), emit: versions
         
     script:
