@@ -12,7 +12,7 @@ process strandseq_phase {
     tag "${patient}"
     cpus 12
     memory "400 GB"
-    container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
+    container "quay.io/pedrofeijao/patmat:1.3"
     publishDir "${params.output_folder}/${patient}", mode: 'copy', pattern: "strandseq_phase"
   
     input:
@@ -56,7 +56,7 @@ process patmat {
     tag "${patient}"
     cpus 48
     memory "360 GB"
-    container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
+    container "quay.io/pedrofeijao/patmat:1.3"
     publishDir "${params.output_folder}/${patient}/", mode: 'copy', pattern: 'patmat'
     publishDir "${params.output_folder}/${patient}/logs/", mode: 'copy', pattern: "${task.process}.versions.log"
 
@@ -77,7 +77,7 @@ process patmat {
     script:
 	"""
         mkdir -p patmat
-         python3 /opt/patmat.py \
+         python3 /opt/PatMat-1.3.0/patmat/patmat.py \
          -sv ${strandseq_phased_vcf}  \
          -v ${clair_phased_vcf} \
          -mc ${bam} \
@@ -437,7 +437,7 @@ process ashleys_qc {
     tag "${patient}"
     cpus 48
     memory "48 GB"
-    container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
+    container "quay.io/pedrofeijao/ashleys-qc:v0.2.0"
     publishDir "${params.output_folder}/${patient}/ashleys_qc", mode: 'copy', pattern: '{ashleys_fail,ashleys_pass,quality.txt}'
     publishDir "${params.output_folder}/${patient}/logs/", mode: 'copy', pattern: "${task.process}.versions.log"
   
