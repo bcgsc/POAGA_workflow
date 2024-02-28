@@ -58,10 +58,16 @@ process patmat {
     cpus 48
     memory "360 GB"
     container "quay.io/pedrofeijao/patmat:1.3"
-    publishDir "${params.output_folder}/${patient}/patmat", mode: 'copy', pattern: '*', enabled: params.debug
+    // Main output
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Assignment.vcf'
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Scores.tsv'
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'snp_identity_check.txt'
+    // Debug output
+    publishDir "${params.output_folder}/${patient}/patmat", mode: 'copy', pattern: 'patmat_callDML.tsv.gz*', enabled: params.debug
+    publishDir "${params.output_folder}/${patient}/patmat", mode: 'copy', pattern: 'patmat_CpG-Methylation-Status-at-DMRs.tsv', enabled: params.debug
+    publishDir "${params.output_folder}/${patient}/patmat", mode: 'copy', pattern: 'patmat_HP1_HP2_PerReadInfo.tsv', enabled: params.debug
+    publishDir "${params.output_folder}/${patient}/patmat", mode: 'copy', pattern: 'patmat_NonPofO*', enabled: params.debug
+    publishDir "${params.output_folder}/${patient}/patmat", mode: 'copy', pattern: 'patmat_PofO_Assignment_', enabled: params.debug
 
     input:
         tuple val(patient),
@@ -79,7 +85,6 @@ process patmat {
 
     script:
 	"""
-        mkdir -p patmat
          python3 /opt/PatMat-1.3.0/patmat/patmat.py \
          -sv ${strandseq_phased_vcf}  \
          -v ${clair_phased_vcf} \
