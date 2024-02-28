@@ -12,7 +12,7 @@ process strandseq_phase {
     tag "${patient}"
     cpus 12
     memory "400 GB"
-    container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
+    container "quay.io/pedrofeijao/patmat:1.3"
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "${patient}.strandseqphased.inv_aware.vcf"
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "*", enabled: params.debug
   
@@ -57,12 +57,11 @@ process patmat {
     tag "${patient}"
     cpus 48
     memory "360 GB"
-    container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
+    container "quay.io/pedrofeijao/patmat:1.3"
     publishDir "${params.output_folder}/${patient}/patmat", mode: 'copy', pattern: '*', enabled: params.debug
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Assignment.vcf'
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Scores.tsv'
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'snp_identity_check.txt'
-    
 
     input:
         tuple val(patient),
@@ -80,7 +79,8 @@ process patmat {
 
     script:
 	"""
-         python3 /opt/patmat.py \
+        mkdir -p patmat
+         python3 /opt/PatMat-1.3.0/patmat/patmat.py \
          -sv ${strandseq_phased_vcf}  \
          -v ${clair_phased_vcf} \
          -mc ${bam} \
@@ -430,7 +430,7 @@ process ashleys_qc {
     tag "${patient}"
     cpus 48
     memory "48 GB"
-    container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
+    container "quay.io/pedrofeijao/ashleys-qc:v0.2.0"
     publishDir "${params.output_folder}/${patient}/ashleys_qc", mode: 'copy', pattern: '{fail,pass,quality.txt}'
   
     input:
