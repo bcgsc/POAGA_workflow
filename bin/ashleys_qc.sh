@@ -34,11 +34,11 @@ _run_ashleys() {
 
   ashleys.py predict -p ./features.tsv -o ./quality.txt -m /opt/ashleys-qc/models/svc_default.pkl
 
-  mkdir ashleys_pass
-  mkdir ashleys_fail
+  mkdir pass
+  mkdir fail
   
-  awk -v pval=$PASS_PROBABILITY 'NR>1 && $3>= pval { print $1 }' ./quality.txt | xargs -i cp $BAM_FOLDER/{} $BAM_FOLDER/{}.bai ashleys_pass
-  awk -v pval=$PASS_PROBABILITY 'NR>1 && $3< pval { print $1 }' ./quality.txt | xargs -i cp $BAM_FOLDER/{} $BAM_FOLDER/{}.bai ashleys_fail
+  awk -v pval=$PASS_PROBABILITY 'NR>1 && $3>= pval { print $1 }' ./quality.txt | xargs -i cp $BAM_FOLDER/{} $BAM_FOLDER/{}.bai pass
+  awk -v pval=$PASS_PROBABILITY 'NR>1 && $3< pval { print $1 }' ./quality.txt | xargs -i cp $BAM_FOLDER/{} $BAM_FOLDER/{}.bai fail
 
 }
 _main() {
