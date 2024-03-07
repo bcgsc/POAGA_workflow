@@ -401,6 +401,18 @@ process strand_pass_fail_cells {
         tuple val("${patient}"), path("fail_strandseq_bams"), emit: fail_strandseq_bams
         path("versions.yml"), emit: versions
         
+    stub:
+    """
+        mkdir pass_strandseq_bams
+        mkdir fail_strandseq_bams
+        touch pass.strandseq.files.txt
+        touch fail.strandseq.files.txt
+        touch versions.yml
+        cp *bam pass_strandseq_bams
+        cd pass_strandseq_bams
+        ls *bam | xargs -i sambamba index -t ${task.cpus} {}
+    """
+
     //had to use a folder for the reference and give the name here to get it available in the container 
     script:
 
@@ -453,6 +465,14 @@ process ashleys_qc {
         tuple val("${patient}"), path("fail"), emit: ashleys_fail_folder
         path("versions.yml"), emit: versions
         
+    stub:
+    """
+        mkdir pass
+        mkdir fail
+        cp ${strandseq_pass_bam_folder}/*bam ${strandseq_pass_bam_folder}/*bai pass
+        echo "Skipped Ashleys QC" > quality.txt
+        touch versions.yml
+    """
     script:
     def ASHLEYS_VERSION="0.2.0"
 	"""
