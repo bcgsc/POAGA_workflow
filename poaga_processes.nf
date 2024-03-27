@@ -264,8 +264,8 @@ process strandseq_cutadapt {
 
     script:
 	"""
-        read1=`ls ${fastq_folder}/*R1_*`
-        read2=`ls ${fastq_folder}/*R2_*`
+        read1=`ls ${fastq_folder}/*_R1*`
+        read2=`ls ${fastq_folder}/*_R2*`
         cell_name=`ls -d ${fastq_folder}`
         
         cutadapt \
