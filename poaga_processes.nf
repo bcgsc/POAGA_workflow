@@ -230,11 +230,14 @@ process strandseq_concat_fastq {
     script:
 	"""
         mkdir merged_fastqs 
-        for i in \$(ls ${strandseq_folder}/*.fastq.gz | sed 's/${strandseq_folder}\\///' | cut -f1-2 -d_ | sort -u)
+        for r1 in ${strandseq_folder}/*_R1*.fastq.gz
         do
-            mkdir -p merged_fastqs/"\$i"
-            cat ${strandseq_folder}/"\$i"_*R1*.fastq.gz > merged_fastqs/"\$i"/"\$i"_R1_001.fastq.gz
-            cat ${strandseq_folder}/"\$i"_*R2*.fastq.gz > merged_fastqs/"\$i"/"\$i"_R2_001.fastq.gz
+            r2=\${r1//_R1/_R2}  # get R2 filename
+            prefix=\$( basename \$r1 | sed -r 's/_R1.*fastq.gz//')  # prefix (sample name before R{1,2})
+            OUT=merged_fastqs/\$prefix
+            mkdir -p \$OUT
+            cp \$r1 \$OUT/\$(basename \$r1)
+            cp \$r2 \$OUT/\$(basename \$r2)
         done
 
         # Log tool versions and container
@@ -261,8 +264,8 @@ process strandseq_cutadapt {
 
     script:
 	"""
-        read1=`ls ${fastq_folder}/*R1*`
-        read2=`ls ${fastq_folder}/*R2*`
+        read1=`ls ${fastq_folder}/*_R1*`
+        read2=`ls ${fastq_folder}/*_R2*`
         cell_name=`ls -d ${fastq_folder}`
         
         cutadapt \
