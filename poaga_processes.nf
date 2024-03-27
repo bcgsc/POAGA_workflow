@@ -233,8 +233,8 @@ process strandseq_concat_fastq {
         for r1 in ${strandseq_folder}/*_R1*.fastq.gz
         do
             r2=\${r1//_R1/_R2}  # get R2 filename
-            preffix=\$( basename \$r1 | sed -r 's/_R1.*fastq.gz//')  # preffix (sample name before R{1,2})
-            OUT=merged_fastqs/\$preffix
+            prefix=\$( basename \$r1 | sed -r 's/_R1.*fastq.gz//')  # prefix (sample name before R{1,2})
+            OUT=merged_fastqs/\$prefix
             mkdir -p \$OUT
             cp \$r1 \$OUT/\$(basename \$r1)
             cp \$r2 \$OUT/\$(basename \$r2)
