@@ -1,10 +1,18 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
-/*
-binaries
-*/
-// try to use public containers where available
+process log_pipeline_version {
+    output:
+        path("versions.yml"), emit: versions
+    script:
+    """
+        cat <<-END_VERSIONS > versions.yml
+        ---
+        Pipeline version:"${workflow.manifest.version}"
+        Nextflow version: "${nextflow.version}"
+        END_VERSIONS
+    """
+}
 
 // https://github.com/vahidAK/PatMat
 // phased the strandseq data with the clair3 vcf

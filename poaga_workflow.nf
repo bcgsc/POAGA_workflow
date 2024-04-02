@@ -1,6 +1,7 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
+include {log_pipeline_version} from './poaga_processes.nf'
 include {strandseq_concat_fastq} from './poaga_processes.nf'
 include {strandseq_cutadapt} from './poaga_processes.nf'
 include {strandseq_bowtie} from './poaga_processes.nf'
@@ -79,17 +80,18 @@ samples_file        : ${params.input_csv}
 * Main workflow
 */
 
-//parses CSV file and runs the run_artic
 workflow {
-    //parse the json or csv input (TBD)
     input = Channel
         .fromPath(params.input_csv)
         .splitCsv(header:true)
         .map{ row-> tuple(row.patient,row.strand_seq_fastq,row.clair3_vcf,row.bam,row.bai) }
 
+    // Log pipeline version:
+    ch_versions = log_pipeline_version()
+
     //implemented below. Does the basic aligning, tidying and read count qc for strand-seq
     strandseq(input)
-    ch_versions = strandseq.out.ch_versions
+    ch_versions = ch_versions.mix(strandseq.out.ch_versions)
 
     //ashley's qc - scores the cells, returns folders with the cells that pass and fail
     ashleys_qc(input.join(strandseq.out.pass_strandseq_bam_folder), params.min_ashleys_qc_prob)
