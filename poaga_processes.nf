@@ -8,8 +8,8 @@ process log_pipeline_version {
     """
         cat <<-END_VERSIONS > versions.yml
         ---
-        Pipeline version:"${workflow.manifest.version}"
-        Nextflow version: "${nextflow.version}"
+        Pipeline version: ${workflow.manifest.version}
+        Nextflow version: ${nextflow.version}
         END_VERSIONS
     """
 }
@@ -55,7 +55,7 @@ process strandseq_phase {
         ---
         Process:"${task.process}"
         Container: "${task.container}"
-        strandseq_phase.R: "${STRANDSEQ_PHASE_VERSION}"
+        strandseq_phase.R: ${STRANDSEQ_PHASE_VERSION}
         END_VERSIONS
     """
 }
@@ -111,7 +111,7 @@ process patmat {
         ---
         Process:"${task.process}"
         Container: "${task.container}"
-        patmat: \$( /opt/patmat.py --version )
+        patmat: \$( python3 /opt/PatMat-1.3.0/patmat/patmat.py --version )
         END_VERSIONS
     """
 }
