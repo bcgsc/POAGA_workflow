@@ -55,7 +55,7 @@ process strandseq_phase {
         ---
         Process:"${task.process}"
         Container: "${task.container}"
-        strandseq_phase.R: $STRANDSEQ_PHASE_VERSION
+        strandseq_phase.R: "${STRANDSEQ_PHASE_VERSION}"
         END_VERSIONS
     """
 }
