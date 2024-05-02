@@ -1,20 +1,23 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
-include {log_pipeline_version} from './poaga_processes.nf'
-include {strandseq_concat_fastq} from './poaga_processes.nf'
-include {strandseq_cutadapt} from './poaga_processes.nf'
-include {strandseq_bowtie} from './poaga_processes.nf'
-include {strandseq_tidy_reads} from './poaga_processes.nf'
-include {strandseq_mark_duplicates} from './poaga_processes.nf'
-include {strand_pass_fail_cells} from './poaga_processes.nf'
-include {ashleys_qc} from './poaga_processes.nf'
-include {strandseq_phase} from './poaga_processes.nf'
-include {patmat} from './poaga_processes.nf'
-include {prepare_whatshap_files} from './poaga_processes.nf'
-include {whatshap_haplotag} from './poaga_processes.nf'
-include {sort_haplotagged_bam} from './poaga_processes.nf'
+include {
+    ashleys_qc
+    compress_haplotagged_bam
+    log_pipeline_version
+    patmat
+    prepare_whatshap_files
+    sort_haplotagged_bam
+    strand_pass_fail_cells
+    strandseq_bowtie
+    strandseq_concat_fastq
+    strandseq_cutadapt
+    strandseq_mark_duplicates
+    strandseq_phase
+    strandseq_tidy_reads
+    whatshap_haplotag
 
+} from './poaga_processes.nf'
 
 // HELP message
 if ( params.help ) {
@@ -113,6 +116,10 @@ workflow {
     ch_versions = ch_versions.mix(whatshap_haplotag.out.versions.take(1))
 
     sort_haplotagged_bam(whatshap_haplotag.out.haplotagged_bam)
+    ch_versions = ch_versions.mix(sort_haplotagged_bam.out.versions.take(1))
+
+    //Compress BAM to CRAM
+    compress_haplotagged_bam(sort_haplotagged_bam.out.haplotagged_sorted_bam, params.reference_genome)
     ch_versions = ch_versions.mix(sort_haplotagged_bam.out.versions.take(1))
 
     // Merge and publish logs
