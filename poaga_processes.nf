@@ -190,7 +190,6 @@ process sort_haplotagged_bam {
     cpus 48
     memory "48 GB"
     container "quay.io/biocontainers/samtools:1.19.2--h50ea8bc_0"
-    publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'PofO_HaploTagged.sorted.bam*'
 
     input:
         tuple val(patient),
@@ -497,4 +496,38 @@ process ashleys_qc {
         Ashleys: $ASHLEYS_VERSION
         END_VERSIONS
     """
+}
+
+process compress_haplotagged_bam {
+    tag "${patient}"
+    cpus 24
+    memory "48 GB"
+    container "quay.io/biocontainers/samtools:1.19.2--h50ea8bc_0"
+    publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy'
+
+
+    input:
+        tuple val(patient),
+            path(bam),
+            path(bai)
+        path reference_genome
+
+	output:
+        tuple val("${patient}"), path("PofO_HaploTagged.sorted.cram"), path("PofO_HaploTagged.sorted.cram.crai"), emit: cram
+        path("versions.yml"), emit: versions
+
+    script:
+	"""
+        samtools view -@ ${task.cpus} -O CRAM,store_md=1,store_nm=1 -T ${reference_genome} $bam -o PofO_HaploTagged.sorted.cram
+        samtools index -@ ${task.cpus} PofO_HaploTagged.sorted.cram
+
+        # Log tool versions and containers
+        cat <<-END_VERSIONS > versions.yml
+        ---
+        Process:"${task.process}"
+        Container: "${task.container}"
+        samtools: \$(echo \$(samtools --version 2>&1) | sed 's/^.*samtools //; s/Using.*\$//')
+        END_VERSIONS
+    """
+
 }
