@@ -70,12 +70,13 @@ process patmat {
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Assignment.vcf'
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Scores.tsv'
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'snp_identity_check.txt'
+    publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_CpG-Methylation-Status-at-DMRs.tsv'
+
     // Debug output
     publishDir "${params.output_folder}/${patient}/patmat", mode: 'copy', pattern: 'patmat_callDML.tsv.gz*', enabled: params.debug
-    publishDir "${params.output_folder}/${patient}/patmat", mode: 'copy', pattern: 'patmat_CpG-Methylation-Status-at-DMRs.tsv', enabled: params.debug
     publishDir "${params.output_folder}/${patient}/patmat", mode: 'copy', pattern: 'patmat_HP1_HP2_PerReadInfo.tsv', enabled: params.debug
     publishDir "${params.output_folder}/${patient}/patmat", mode: 'copy', pattern: 'patmat_NonPofO*', enabled: params.debug
-    publishDir "${params.output_folder}/${patient}/patmat", mode: 'copy', pattern: 'patmat_PofO_Assignment_', enabled: params.debug
+    publishDir "${params.output_folder}/${patient}/patmat", mode: 'copy', pattern: 'patmat_PofO_Assignment_*', enabled: params.debug
 
     input:
         tuple val(patient),
