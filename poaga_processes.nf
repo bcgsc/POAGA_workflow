@@ -18,8 +18,8 @@ process log_pipeline_version {
 // phased the strandseq data with the clair3 vcf
 process strandseq_phase {
     tag "${patient}"
-    cpus 12
-    memory "400 GB"
+    cpus 16
+    label "mem400"
     container "quay.io/pedrofeijao/patmat:1.3"
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "${patient}.strandseqphased.inv_aware.vcf"
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "*", enabled: params.debug
@@ -63,8 +63,8 @@ process strandseq_phase {
 //Run vahid's patmat to predict which variants came from each parent
 process patmat {
     tag "${patient}"
-    cpus 48
-    memory "360 GB"
+    cpus 32
+    label "mem400"
     container "quay.io/pedrofeijao/patmat:1.3"
     // Main output
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Assignment.vcf'
@@ -120,8 +120,8 @@ process patmat {
 
 process prepare_whatshap_files {
     tag "${patient}"
-    cpus 48
-    memory "48 GB"
+    cpus 16
+    label "mem64"
     container "quay.io/biocontainers/samtools:1.19.2--h50ea8bc_0"
 
     input:
@@ -153,8 +153,8 @@ process prepare_whatshap_files {
 
 process whatshap_haplotag {
     tag "${patient}"
-    cpus 48
-    memory "48 GB"
+    cpus 4
+    label "mem12"
     container "quay.io/biocontainers/whatshap:2.2--py310h0dbaff4_0"
 
     input:
@@ -188,8 +188,8 @@ process whatshap_haplotag {
 
 process sort_haplotagged_bam {
     tag "${patient}"
-    cpus 48
-    memory "48 GB"
+    cpus 16
+    label "mem64"
     container "quay.io/biocontainers/samtools:1.19.2--h50ea8bc_0"
 
     input:
@@ -219,8 +219,8 @@ process sort_haplotagged_bam {
 
 
 process strandseq_concat_fastq {
-    cpus 12
-    memory "48 GB"
+    cpus 4
+    label "mem12"
     container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
   
     input:
@@ -258,8 +258,8 @@ process strandseq_concat_fastq {
 }
 
 process strandseq_cutadapt {
-    cpus 12
-    memory "48 GB"
+    cpus 4
+    label "mem12"
     container "quay.io/biocontainers/cutadapt:2.6--py36h516909a_0"
   
     input:
@@ -300,8 +300,8 @@ process strandseq_cutadapt {
 
 
 process strandseq_bowtie {
-    cpus 12
-    memory "12 GB"
+    cpus 16
+    label "mem12"
     container "quay.io/biocontainers/bowtie2:2.3.5.1--py27he513fc3_0"
   
     input:
@@ -332,8 +332,8 @@ process strandseq_bowtie {
 
 
 process strandseq_tidy_reads {
-    cpus 2
-    memory "12 GB"
+    cpus 4
+    label "mem12"
     container "quay.io/biocontainers/samtools:1.17--hd87286a_1"
   
     input:
@@ -368,7 +368,7 @@ process strandseq_tidy_reads {
 
 //samtools says we're missing "ms" tags evening though fixmate is run on the bam
 process strandseq_mark_duplicates {
-    cpus 12
+    cpus 4
     memory "12 GB"
     container "quay.io/biocontainers/picard:2.26.10--hdfd78af_0"
   
@@ -396,8 +396,8 @@ process strandseq_mark_duplicates {
 }
 
 process strand_pass_fail_cells {
-    cpus 12
-    memory "12 GB"
+    cpus 4
+    label "mem12"
     container "quay.io/biocontainers/sambamba:1.0--h98b6b92_0"
   
     input:
@@ -456,8 +456,8 @@ process strand_pass_fail_cells {
 
 process ashleys_qc {
     tag "${patient}"
-    cpus 48
-    memory "48 GB"
+    cpus 24
+    label "mem256"
     container "quay.io/pedrofeijao/ashleys-qc:v0.2.0"
     publishDir "${params.output_folder}/${patient}/ashleys_qc", mode: 'copy', pattern: '{fail,pass,quality.txt}'
   
@@ -501,8 +501,8 @@ process ashleys_qc {
 
 process compress_haplotagged_bam {
     tag "${patient}"
-    cpus 24
-    memory "48 GB"
+    cpus 12
+    label "mem64"
     container "quay.io/biocontainers/samtools:1.19.2--h50ea8bc_0"
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy'
 
