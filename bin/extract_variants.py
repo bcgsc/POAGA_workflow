@@ -94,7 +94,7 @@ def fetch_record(reader, chrom, start_pos, end_pos, single=True):
 
 
 def main(raw_arguments=None):
-    """Do the thing.
+    """Extract variants from a VCF file, given an TransVar annotation file.
 
     Args:
         raw_arguments (List[str], optional): Argument list, defaults to sys.argv is not given.
