@@ -4,6 +4,7 @@ nextflow.enable.dsl=2
 include {
     ashleys_qc
     compress_haplotagged_bam
+    extract_variants_of_interest
     log_pipeline_version
     patmat
     prepare_whatshap_files
@@ -38,6 +39,10 @@ if ( params.help ) {
              |  --output_folder         Output folder to store POAGA results.
              |
              |Optional arguments:
+             |  --variants              Variant CSV file(s). Each row corresponds to a variant of interest.
+             |                          The CSV file must have a header with 2 columns:
+             |     - patient            Sample label, matching the 'input_csv' label(s).
+             |     - variant            Variant in HGVS cDNA notation.
              |  --min_reads_threshold   Minimum number of high quality reads to pass a StrandSeq library file.
              |                [default: ${params.min_reads_threshold}]
              |  --chromosomes           Comma-separated list of chromosomes to process.
@@ -48,6 +53,7 @@ if ( params.help ) {
              |                [default: ${workDir}]
              |  -profile                Nextflow config profile(s) with pre-defined parameters (comma-separated profiles to use more than one). 
              |                Available profiles include 'hg38_no_alt' (hg38 reference genome) and 'test' (run minimal dataset test)
+             |
              |
              |Useful Nextflow arguments:
              |  -resume                Does not execute steps that have already been executed with the same parameters. Useful for resuming
@@ -122,10 +128,15 @@ workflow {
     compress_haplotagged_bam(sort_haplotagged_bam.out.haplotagged_sorted_bam, params.reference_genome)
     ch_versions = ch_versions.mix(sort_haplotagged_bam.out.versions.take(1))
 
+    // Variants of interest:
+    if ( params.variants ) {
+        extract_variants_of_interest(params.variants, patmat.out.pofo_assignment_vcf)
+        ch_versions = ch_versions.mix(extract_variants_of_interest.out.ch_versions)
+    }
+
     // Merge and publish logs
     ch_versions.unique().collectFile(name: params.logfile, storeDir: params.output_folder)
 }
-
 
 /*
 Takes care of the preliminary strand-seq analysis including:

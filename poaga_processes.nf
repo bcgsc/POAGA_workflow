@@ -530,5 +530,131 @@ process compress_haplotagged_bam {
         samtools: \$(echo \$(samtools --version 2>&1) | sed 's/^.*samtools //; s/Using.*\$//')
         END_VERSIONS
     """
+}
 
+process annotate_variants {
+    tag "${patient}"
+    cpus 12
+    debug true
+    memory "24 GB"
+    container "pedrofeijao/transvar:hg38"
+    publishDir "${params.output_folder}/${patient}/variants_of_interest", mode: 'copy'
+
+    input:
+        tuple val(patient),
+            val(variant)
+
+	output:
+        tuple val(patient), path("${variant.replace(">","-").replace(":",".")}.annotation.txt"), emit: variant_annotation
+        path("versions.yml"), emit: versions
+
+    script:
+	"""
+        transvar canno --refseq -i '${variant}' --longest > ${variant.replace(">","-").replace(":",".")}.annotation.txt
+
+        # Log tool versions and containers
+        cat <<-END_VERSIONS > versions.yml
+        ---
+        Process:"${task.process}"
+        Container: "${task.container}"
+        TransVar: \$( transvar --version 2>&1)
+        END_VERSIONS
+    """
+}
+
+process compress_vcf {
+    tag "${patient}"
+    cpus 12
+    debug true
+    memory "24 GB"
+    container "quay.io/biocontainers/samtools:1.19.2--h50ea8bc_0"
+
+    input:
+        tuple val(patient),
+            path(vcf)
+
+    output:
+        tuple val(patient),
+            path("${vcf}.gz"),
+            path("${vcf}.gz.tbi"), emit: compressed_vcf
+        path("versions.yml"), emit: versions
+    script:
+    """
+        bgzip $vcf
+        tabix ${vcf}.gz
+
+        # Log tool versions and containers
+        cat <<-END_VERSIONS > versions.yml
+        ---
+        Process:"${task.process}"
+        Container: "${task.container}"
+        bgzip: \$( bgzip --version 2>&1 | grep "^bgzip")
+        tabix: \$( tabix --version 2>&1 | grep "^tabix" )
+        END_VERSIONS
+    """
+}
+
+
+process extract_variants {
+    tag "${patient}"
+    cpus 12
+    memory "24 GB"
+    container "pedrofeijao/vcfpy:0.13.8"
+    publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy'
+
+    input:
+        tuple val(patient),
+            path(annotations),
+            path(vcf),
+            path(vcf_idx)
+
+	output:
+        tuple val(patient), path("variants_of_interest.vcf"), emit: variants_interest_vcf
+        tuple val(patient), path("variants_of_interest_status.txt"), emit: variants_interest_txt
+        path("versions.yml"), emit: versions
+
+    script:
+	"""
+        extract_variants.py -v $vcf -a $annotations -o variants_of_interest.vcf -s variants_of_interest_status.txt
+
+        # Log tool versions and containers
+        cat <<-END_VERSIONS > versions.yml
+        ---
+        Process:"${task.process}"
+        Container: "${task.container}"
+        python: \$( python --version 2>&1)
+        vcfpy: \$( pip list | grep vcfpy)
+        END_VERSIONS
+    """
+}
+
+workflow extract_variants_of_interest {
+    take:
+        variants
+        pofo_vcf
+
+    main:
+        // parse variants with TransVar
+        Channel.fromPath(variants)
+                .splitCsv(header:true)
+                .map{ row-> tuple(row.patient, row.variant)}
+                .groupTuple()
+                .transpose()
+                | annotate_variants
+
+        // compress and index vcf to search variants
+        compress_vcf(pofo_vcf)
+
+        // extract
+        annotate_variants.out.variant_annotation
+            .groupTuple()
+            .join(compress_vcf.out.compressed_vcf)
+            | extract_variants
+
+        // build tool versions channel
+        ch_versions = annotate_variants.out.versions.take(1)
+            .mix(compress_vcf.out.versions.take(1))
+            .mix(extract_variants.out.versions.take(1))
+    emit:
+        ch_versions
 }
