@@ -88,8 +88,10 @@ process patmat {
         path(reference_genome)
 
 	output:
-        tuple val("${patient}"), path("*"), emit: patmat_all_output
-        tuple val("${patient}"), path("patmat_PofO_Assignment.vcf"), emit: pofo_assignment_vcf
+        tuple val(patient), path("*"), emit: patmat_all_output
+        tuple val(patient), path("patmat_PofO_Assignment.vcf"), emit: pofo_assignment_vcf
+        tuple val(patient), path("patmat_PofO_Scores.tsv"), emit: pofo_scores
+        tuple val(patient), path("patmat_CpG-Methylation-Status-at-DMRs.tsv"), emit: pofo_dmr_status
         path("versions.yml"), emit: versions
 
     script:
@@ -538,7 +540,7 @@ process annotate_variants {
     debug true
     memory "24 GB"
     container "pedrofeijao/transvar:hg38"
-    publishDir "${params.output_folder}/${patient}/variants_of_interest", mode: 'copy'
+    publishDir "${params.output_folder}/${patient}/POAGA/variants_of_interest", mode: 'copy'
 
     input:
         tuple val(patient),
@@ -600,7 +602,7 @@ process extract_variants {
     cpus 12
     memory "24 GB"
     container "pedrofeijao/vcfpy:0.13.8"
-    publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy'
+    publishDir "${params.output_folder}/${patient}/POAGA/variants_of_interest", mode: 'copy'
 
     input:
         tuple val(patient),
@@ -628,19 +630,125 @@ process extract_variants {
     """
 }
 
+process parse_regions_of_interest {
+    tag "${patient}"
+    cpus 12
+    memory "24 GB"
+    container "pedrofeijao/transvar:hg38"
+    publishDir "${params.output_folder}/${patient}/POAGA/variants_of_interest", mode: 'copy'
+
+    input:
+        tuple val(patient),
+            path(annotations),
+            path(imprinted_regions)
+
+	output:
+        tuple val(patient), path("regions_of_interest.bed"), emit: regions_of_interest
+        path("versions.yml"), emit: versions
+
+    script:
+	"""
+        parse_regions_of_interest.sh ${params.flanking_region_size} ${imprinted_regions} $annotations > regions_of_interest.bed
+
+        # Log tool versions and containers
+        cat <<-END_VERSIONS > versions.yml
+        ---
+        Process:"${task.process}"
+        Container: "${task.container}"
+        TransVar: \$( transvar --version 2>&1)
+        END_VERSIONS
+    """
+}
+
+process subset_regions_of_interest_bam {
+    tag "${patient}"
+    cpus 24
+    memory "24 GB"
+    container "quay.io/biocontainers/samtools:1.19.2--h50ea8bc_0"
+    publishDir "${params.output_folder}/${patient}/POAGA/variants_of_interest", mode: 'copy'
+
+    input:
+        tuple val(patient),
+            path(bed_file),
+            path(bam_file),
+            path(bai_file)
+
+	output:
+        tuple val(patient), path("regions_of_interest.bam"), path("regions_of_interest.bam.bai"), emit: regions_of_interest_bam
+        path("versions.yml"), emit: versions
+
+    script:
+	"""
+        samtools view -b -h -L ${bed_file} ${bam_file} > "regions_of_interest.bam"
+        samtools index -@ ${task.cpus} regions_of_interest.bam
+
+        # Log tool versions and containers
+        cat <<-END_VERSIONS > versions.yml
+        ---
+        Process:"${task.process}"
+        Container: "${task.container}"
+        samtools: \$(echo \$(samtools --version 2>&1) | sed 's/^.*samtools //; s/Using.*\$//')
+        END_VERSIONS
+    """
+}
+
+process subset_pofo_methylation_of_interest {
+    tag "${patient}"
+    cpus 24
+    memory "24 GB"
+    container "pedrofeijao/vcfpy:0.13.8"
+    publishDir "${params.output_folder}/${patient}/POAGA/variants_of_interest", mode: 'copy'
+
+    input:
+        tuple val(patient),
+            path(bed_file),
+            path(pofo_scores),
+            path(pofo_dmr_status)
+
+	output:
+        tuple val(patient),
+            path("pofo_scores_regions_of_interest.tsv"),
+            path("CpG-methylation-status-at-DMRs-regions_of_interest.tsv"), emit: regions_of_interest_methylation
+        path("versions.yml"), emit: versions
+
+    script:
+	"""
+        subset_pofo_methylation_of_interest.py \
+            -b ${bed_file} \
+            -s ${pofo_scores} \
+            -d ${pofo_dmr_status} \
+            -so pofo_scores_regions_of_interest.tsv \
+            -do CpG-methylation-status-at-DMRs-regions_of_interest.tsv
+
+        # Log tool versions and containers
+        cat <<-END_VERSIONS > versions.yml
+        ---
+        Process:"${task.process}"
+        Container: "${task.container}"
+        python: \$( python --version 2>&1)
+        END_VERSIONS
+
+    """
+}
+
 workflow extract_variants_of_interest {
     take:
         variants
         pofo_vcf
+        pofo_scores
+        pofo_dmr_status
+        imprinted_regions
+        haplotagged_bam
 
     main:
         // parse variants with TransVar
-        Channel.fromPath(variants)
+        variants_channel = Channel.fromPath(variants)
                 .splitCsv(header:true)
                 .map{ row-> tuple(row.patient, row.variant)}
                 .groupTuple()
                 .transpose()
-                | annotate_variants
+
+        annotate_variants(variants_channel)
 
         // compress and index vcf to search variants
         compress_vcf(pofo_vcf)
@@ -650,6 +758,24 @@ workflow extract_variants_of_interest {
             .groupTuple()
             .join(compress_vcf.out.compressed_vcf)
             | extract_variants
+
+        // get Genes:
+        parse_regions_channel =
+            annotate_variants.out.variant_annotation.groupTuple()
+            .combine(imprinted_regions)
+
+        parse_regions_of_interest(parse_regions_channel)
+
+        regions_and_bam_channel = parse_regions_of_interest.out.regions_of_interest
+            .join(haplotagged_bam)
+
+        subset_regions_of_interest_bam(regions_and_bam_channel)
+
+        regions_and_methylation_channel = parse_regions_of_interest.out.regions_of_interest
+            .join(pofo_scores)
+            .join(pofo_dmr_status)
+
+        subset_pofo_methylation_of_interest(regions_and_methylation_channel)
 
         // build tool versions channel
         ch_versions = annotate_variants.out.versions.take(1)

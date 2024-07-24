@@ -130,7 +130,14 @@ workflow {
 
     // Variants of interest:
     if ( params.variants ) {
-        extract_variants_of_interest(params.variants, patmat.out.pofo_assignment_vcf)
+        extract_variants_of_interest(
+            params.variants,
+            patmat.out.pofo_assignment_vcf,
+            patmat.out.pofo_scores,
+            patmat.out.pofo_dmr_status,
+            Channel.fromPath("${projectDir}/assets/Imprinted_DMR_List_V1.tsv"),
+            sort_haplotagged_bam.out.haplotagged_sorted_bam
+        )
         ch_versions = ch_versions.mix(extract_variants_of_interest.out.ch_versions)
     }
 
