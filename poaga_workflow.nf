@@ -3,6 +3,7 @@ nextflow.enable.dsl=2
 
 include {
     ashleys_qc
+    calc_het_hom_discordance
     compress_haplotagged_bam
     log_pipeline_version
     patmat
@@ -44,9 +45,9 @@ if ( params.help ) {
              |                [default: ${params.chromosomes}]
              |  --min_ashleys_qc_prob   Minimum probability score for a Strand-seq library to pass the ASHLEYS QC step.
              |                [default: ${params.min_ashleys_qc_prob}]
-             |  -w                      The NextFlow work directory. 
+             |  -w                      The NextFlow work directory.
              |                [default: ${workDir}]
-             |  -profile                Nextflow config profile(s) with pre-defined parameters (comma-separated profiles to use more than one). 
+             |  -profile                Nextflow config profile(s) with pre-defined parameters (comma-separated profiles to use more than one).
              |                Available profiles include 'hg38_no_alt' (hg38 reference genome) and 'test' (run minimal dataset test)
              |
              |Useful Nextflow arguments:
@@ -104,12 +105,16 @@ workflow {
     strandseq_phase(input.join(ashleys_qc.out.ashleys_pass_folder), params.chromosomes)
     ch_versions = ch_versions.mix(strandseq_phase.out.versions.take(1))
 
+    //het-hom-discordance
+    calc_het_hom_discordance(input.join(strandseq_phase.out.vcf))
+    ch_versions = ch_versions.mix(calc_het_hom_discordance.out.versions.take(1))
+
     //patmat
     patmat(input.join(strandseq_phase.out.vcf), params.reference_genome)
     ch_versions = ch_versions.mix(patmat.out.versions.take(1))
 
     //Haplotagging the BAM file with whatshap
-    prepare_whatshap_files(input.join(patmat.out.pofo_assignment_vcf)) 
+    prepare_whatshap_files(input.join(patmat.out.pofo_assignment_vcf))
     ch_versions = ch_versions.mix(prepare_whatshap_files.out.versions.take(1))
 
     whatshap_haplotag(prepare_whatshap_files.out.prep_files, params.reference_genome, params.reference_genome_idx)
@@ -160,7 +165,7 @@ workflow strandseq {
         //tidybam
         strandseq_tidy_reads(strandseq_bowtie.out.sam_file)
         ch_versions = ch_versions.mix(strandseq_tidy_reads.out.versions.take(1))
-        
+
         //remove bams with very few reads
         strandseq_mark_duplicates(strandseq_tidy_reads.out.bam_file)
         ch_versions = ch_versions.mix(strandseq_mark_duplicates.out.versions.take(1))
