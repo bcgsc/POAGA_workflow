@@ -536,6 +536,7 @@ process compress_haplotagged_bam {
 process calc_het_hom_discordance {
     tag "${patient}"
     cpus 2
+    label "mem12"
     container "quay.io/biocontainers/bcftools:1.20--h8b25389_0"
     publishDir "${params.output_folder}/${patient}/qc_metrics", mode: 'copy'
 
