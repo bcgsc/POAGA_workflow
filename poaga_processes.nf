@@ -23,7 +23,7 @@ process strandseq_phase {
     container "quay.io/pedrofeijao/patmat:1.3"
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "${patient}.strandseqphased.inv_aware.vcf"
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "*", enabled: params.debug
-  
+
     input:
         tuple val(patient),
             path(strandseq_bam_folder),
@@ -222,7 +222,7 @@ process strandseq_concat_fastq {
     cpus 4
     label "mem12"
     container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
-  
+
     input:
         tuple val(patient),
             path(strandseq_folder),
@@ -237,7 +237,7 @@ process strandseq_concat_fastq {
     //Added the symlin to rename the input folder to something without underscores
     script:
 	"""
-        mkdir merged_fastqs 
+        mkdir merged_fastqs
         for r1 in ${strandseq_folder}/*_R1*.fastq.gz
         do
             r2=\${r1//_R1/_R2}  # get R2 filename
@@ -261,7 +261,7 @@ process strandseq_cutadapt {
     cpus 4
     label "mem12"
     container "quay.io/biocontainers/cutadapt:2.6--py36h516909a_0"
-  
+
     input:
         tuple val(patient),
             path(fastq_folder)
@@ -275,7 +275,7 @@ process strandseq_cutadapt {
         read1=`ls ${fastq_folder}/*_R1*`
         read2=`ls ${fastq_folder}/*_R2*`
         cell_name=`ls -d ${fastq_folder}`
-        
+
         cutadapt \
             -g AATGATACGGCGACCACCGAGATCTACACNNNNNNNNACACTCTTTCCCTACACGACGCTCTTCCGATCT \
             -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNNNATCTCGTATGCCGTCTTCTGCTTG \
@@ -286,7 +286,7 @@ process strandseq_cutadapt {
             \${read1} \
             \${read2} \
             -m 30 \
-            -q 15  
+            -q 15
 
         # Log tool versions and containers
         cat <<-END_VERSIONS > versions.yml
@@ -303,7 +303,7 @@ process strandseq_bowtie {
     cpus 16
     label "mem12"
     container "quay.io/biocontainers/bowtie2:2.3.5.1--py27he513fc3_0"
-  
+
     input:
         tuple val(patient),
             path(fastq1),
@@ -314,9 +314,9 @@ process strandseq_bowtie {
         tuple val("${patient}"), path("${fastq1.simpleName}.sam"), emit: sam_file
         path("versions.yml"), emit: versions
 
-    //had to use a folder for the reference and give the name here to get it available in the container 
+    //had to use a folder for the reference and give the name here to get it available in the container
     script:
-	"""	
+	"""
         bowtie2 -x ${bowtie_ref}/hg38_no_alt -p ${task.cpus} -1 ${fastq1} -2 ${fastq2} -S ${fastq1.simpleName}.sam
 
 
@@ -335,7 +335,7 @@ process strandseq_tidy_reads {
     cpus 4
     label "mem12"
     container "quay.io/biocontainers/samtools:1.17--hd87286a_1"
-  
+
     input:
         tuple val(patient),
            path(sam_file)
@@ -344,13 +344,13 @@ process strandseq_tidy_reads {
         tuple val("${patient}"), path("${sam_file.simpleName}.sorted.bam"), emit: bam_file
         path("versions.yml"), emit: versions
 
-    //had to use a folder for the reference and give the name here to get it available in the container 
+    //had to use a folder for the reference and give the name here to get it available in the container
     script:
 	"""
         chrs=\$(printf "chr%s " {1..22} X Y)
         samtools view -bS ${sam_file} | samtools sort - -o ${sam_file.simpleName}.bam
-        samtools index ${sam_file.simpleName}.bam 
-        
+        samtools index ${sam_file.simpleName}.bam
+
         # Remove unmapped reads, secondary alignments, poor-quality reads, unwanted chromsomes, and then clean up any abandoned paired reads
         samtools view -F2052 -q10 -h ${sam_file.simpleName}.bam \$chrs | grep -v -E '@SQ.*chrUn|@SQ.*random|@SQ.*chrEBV' | samtools sort -n - | samtools fixmate -O bam - - | samtools sort - | samtools view -bh -f1 -o ${sam_file.simpleName}.sorted.bam
 
@@ -371,7 +371,7 @@ process strandseq_mark_duplicates {
     cpus 4
     memory "12 GB"
     container "quay.io/biocontainers/picard:2.26.10--hdfd78af_0"
-  
+
     input:
         tuple val(patient),
            path(bam_file)
@@ -380,7 +380,7 @@ process strandseq_mark_duplicates {
         tuple val("${patient}"), path("${bam_file.simpleName}.dup.bam"), emit:bam_file
         path("versions.yml"), emit: versions
 
-    //had to use a folder for the reference and give the name here to get it available in the container 
+    //had to use a folder for the reference and give the name here to get it available in the container
     script:
 	"""
         picard MarkDuplicates -I ${bam_file} -O ${bam_file.simpleName}.dup.bam -M ${bam_file.simpleName}.metrics
@@ -399,7 +399,7 @@ process strand_pass_fail_cells {
     cpus 4
     label "mem12"
     container "quay.io/biocontainers/sambamba:1.0--h98b6b92_0"
-  
+
     input:
         tuple val(patient),
            path(bam_files)
@@ -411,7 +411,7 @@ process strand_pass_fail_cells {
         tuple val("${patient}"), path("pass_strandseq_bams"), emit: pass_strandseq_bams
         tuple val("${patient}"), path("fail_strandseq_bams"), emit: fail_strandseq_bams
         path("versions.yml"), emit: versions
-        
+
     stub:
     """
         mkdir pass_strandseq_bams
@@ -424,14 +424,14 @@ process strand_pass_fail_cells {
         ls *bam | xargs -i sambamba index -t ${task.cpus} {}
     """
 
-    //had to use a folder for the reference and give the name here to get it available in the container 
+    //had to use a folder for the reference and give the name here to get it available in the container
     script:
 
-	"""	
+	"""
         mkdir pass_strandseq_bams
         mkdir fail_strandseq_bams
 
-        ls *bam | xargs -i echo "sambamba flagstat {} > {}.flagstat" | bash 
+        ls *bam | xargs -i echo "sambamba flagstat {} > {}.flagstat" | bash
 
         grep -H total *.flagstat | awk '{ print \$1 }' | awk -F ":" '\$2>$min_reads_threshold { print \$1 }' | sed 's/.flagstat//' > pass.strandseq.files.txt
         grep -H total *.flagstat | awk '{ print \$1 }' | awk -F ":" '\$2<=$min_reads_threshold { print \$1 }' | sed 's/.flagstat//' > fail.strandseq.files.txt
@@ -460,7 +460,7 @@ process ashleys_qc {
     label "mem256"
     container "quay.io/pedrofeijao/ashleys-qc:v0.2.0"
     publishDir "${params.output_folder}/${patient}/ashleys_qc", mode: 'copy', pattern: '{fail,pass,quality.txt}'
-  
+
     input:
         tuple val(patient),
             path(strandseq_bam_folder),
@@ -475,7 +475,7 @@ process ashleys_qc {
         tuple val("${patient}"), path("pass"), emit: ashleys_pass_folder
         tuple val("${patient}"), path("fail"), emit: ashleys_fail_folder
         path("versions.yml"), emit: versions
-        
+
     stub:
     """
         mkdir pass
@@ -530,5 +530,46 @@ process compress_haplotagged_bam {
         samtools: \$(echo \$(samtools --version 2>&1) | sed 's/^.*samtools //; s/Using.*\$//')
         END_VERSIONS
     """
+
+}
+
+process calc_het_hom_discordance {
+    tag "${patient}"
+    cpus 2
+    label "mem12"
+    container "quay.io/biocontainers/bcftools:1.20--h8b25389_0"
+    publishDir "${params.output_folder}/${patient}/qc_metrics", mode: 'copy'
+
+    input:
+        tuple val(patient),
+            path(strandseq_bam_folder),
+            path(clair_phased_vcf),
+            path(bam),
+            path(bai),
+            path(strandseq_phased_vcf)
+
+	output:
+        tuple val("${patient}"), path("het_hom_discordance.txt"), emit: het_hom_discordance
+        path("versions.yml"), emit: versions
+
+    script:
+    """
+        bgzip ${strandseq_phased_vcf}
+        tabix ${strandseq_phased_vcf}.gz
+        tabix ${clair_phased_vcf}
+        echo "DiscordantSites\tTotalSites\tDiscordance" > het_hom_discordance.txt
+        bcftools gtcheck -e 0 -g ${clair_phased_vcf} ${strandseq_phased_vcf}.gz \
+            | grep "^DC" \
+            | awk  '{ printf "%d\t%d\t%.4f", \$4, \$6, \$4 / \$6  }' \
+            >> het_hom_discordance.txt
+
+        # Log tool versions and containers
+        cat <<-END_VERSIONS > versions.yml
+        ---
+        Process:"${task.process}"
+        Container: "${task.container}"
+        bctools: \$( bcftools --version 2>&1 | grep "^bcftools" )
+        END_VERSIONS
+   """
 
 }
