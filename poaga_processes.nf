@@ -39,7 +39,7 @@ process strandseq_phase {
         path("versions.yml"), emit: versions
 
     script:
-        def STRANDSEQ_PHASE_VERSION="1.3.0"
+        def STRANDSEQ_PHASE_VERSION="1.4.0dev"
 	"""
         /opt/PatMat/Strand-seq/strandseq_phase.R \
         -p TRUE \
