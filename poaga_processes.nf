@@ -65,7 +65,7 @@ process patmat {
     tag "${patient}"
     cpus 32
     label "mem400"
-    container "${params.singularity_folder}/patmat-dev.sif"
+    container "${params.singularity_folder}/patmat-1.4.0_dev.sif"
     // Main output
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Assigned.vcf'
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Scores.tsv'
