@@ -20,7 +20,7 @@ process strandseq_phase {
     tag "${patient}"
     cpus 16
     label "mem400"
-    container "${params.singularity_folder}/patmat-dev.sif"
+    container "${params.singularity_folder}/patmat-1.4.0_dev.sif"
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "${patient}.strandseqphased.inv_aware.vcf"
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "*", enabled: params.debug
 
