@@ -57,7 +57,13 @@ RUN add-apt-repository ppa:c2d4u.team/c2d4u4.0+ -y
 RUN apt install -y r-cran-ggplot2 r-cran-biocmanager r-cran-tibble
 RUN apt install -y r-bioc-beachmat
 RUN Rscript -e 'install.packages(c("argparse", "sys", "R.utils"), repos="http://cran.us.r-project.org")'
+RUN Rscript -e 'install.packages(c("pkgconfig", "pkgdepends", "pak", "curl"), repos="http://cran.us.r-project.org")'
+RUN Rscript -e 'library(pkgdepends); library(pkgconfig); library(pak); pak::pkg_install("vincent-hanlon/InvertypeR")'
+RUN Rscript -e 'BiocManager::install("BSgenome.Hsapiens.UCSC.hg38")'
+RUN Rscript -e 'BiocManager::install("BSgenome.Hsapiens.UCSC.hs1")'
+RUN Rscript -e 'BiocManager::install("DSS")'
 
+# Python packages
 RUN pip3 install pysam pytabix tqdm modbampy
 
 # Patmat
@@ -65,13 +71,6 @@ WORKDIR /opt
 RUN git clone https://github.com/vahidAK/PatMat && cd PatMat \
 	&& git checkout $PATMAT_VERSION \
     && ln -s $PWD/{patmat,Strand-seq}/* /opt
-
-# Now we need to open R and install the required R packages as follows:
-RUN Rscript -e 'install.packages(c("argparse", "sys", "R.utils"), repos="http://cran.us.r-project.org")'
-RUN Rscript -e 'install.packages(c("pkgconfig", "pkgdepends", "pak", "curl"), repos="http://cran.us.r-project.org")'
-RUN Rscript -e 'library(pkgdepends); library(pkgconfig); library(pak); pak::pkg_install("vincent-hanlon/InvertypeR")'
-RUN Rscript -e 'BiocManager::install("DSS")'
-RUN Rscript -e 'BiocManager::install("BSgenome.Hsapiens.UCSC.hg38")'
 
 # Some cleanup
 RUN rm -rf /var/lib/apt/lists/*
