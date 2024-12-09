@@ -116,7 +116,7 @@ workflow {
     ch_versions = ch_versions.mix(calc_het_hom_discordance.out.versions.take(1))
 
     //patmat
-    patmat(input.join(strandseq_phase.out.vcf), params.reference_genome)
+    patmat(input.join(strandseq_phase.out.vcf), params.reference_genome, params.reference_genome_idx)
     ch_versions = ch_versions.mix(patmat.out.versions.take(1))
 
     //Haplotagging the BAM file with whatshap

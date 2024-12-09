@@ -20,7 +20,7 @@ process strandseq_phase {
     tag "${patient}"
     cpus 16
     label "mem400"
-    container "quay.io/pedrofeijao/patmat:1.3"
+    container "${params.singularity_folder}/patmat-1.4.0_dev.sif"
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "${patient}.strandseqphased.inv_aware.vcf"
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "*", enabled: params.debug
 
@@ -39,9 +39,9 @@ process strandseq_phase {
         path("versions.yml"), emit: versions
 
     script:
-        def STRANDSEQ_PHASE_VERSION="1.3.0"
+        def STRANDSEQ_PHASE_VERSION="1.4.0dev"
 	"""
-        /opt/PatMat-1.3.0/Strand-seq/strandseq_phase.R \
+        /opt/PatMat/Strand-seq/strandseq_phase.R \
         -p TRUE \
         -i ${ashleys_pass_bam_folder} \
         -o . \
@@ -65,18 +65,12 @@ process patmat {
     tag "${patient}"
     cpus 32
     label "mem400"
-    container "quay.io/pedrofeijao/patmat:1.3"
+    container "${params.singularity_folder}/patmat-1.4.0_dev.sif"
     // Main output
-    publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Assignment.vcf'
+    publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Assigned.vcf'
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Scores.tsv'
-    publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'snp_identity_check.txt'
+    publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Assigned_info.tsv'
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_CpG-Methylation-Status-at-DMRs.tsv'
-
-    // Debug output
-    publishDir "${params.output_folder}/${patient}/patmat", mode: 'copy', pattern: 'patmat_callDML.tsv.gz*', enabled: params.debug
-    publishDir "${params.output_folder}/${patient}/patmat", mode: 'copy', pattern: 'patmat_HP1_HP2_PerReadInfo.tsv', enabled: params.debug
-    publishDir "${params.output_folder}/${patient}/patmat", mode: 'copy', pattern: 'patmat_NonPofO*', enabled: params.debug
-    publishDir "${params.output_folder}/${patient}/patmat", mode: 'copy', pattern: 'patmat_PofO_Assignment_*', enabled: params.debug
 
     input:
         tuple val(patient),
@@ -86,35 +80,34 @@ process patmat {
             path(bai),
             path(strandseq_phased_vcf)
         path(reference_genome)
+        path(reference_genome_idx)
+
 
 	output:
         tuple val(patient), path("*"), emit: patmat_all_output
-        tuple val(patient), path("patmat_PofO_Assignment.vcf"), emit: pofo_assignment_vcf
+        tuple val(patient), path("patmat_PofO_Assigned.vcf"), emit: pofo_assignment_vcf
         tuple val(patient), path("patmat_PofO_Scores.tsv"), emit: pofo_scores
         tuple val(patient), path("patmat_CpG-Methylation-Status-at-DMRs.tsv"), emit: pofo_dmr_status
         path("versions.yml"), emit: versions
 
     script:
 	"""
-         python3 /opt/PatMat-1.3.0/patmat/patmat.py \
-         -sv ${strandseq_phased_vcf}  \
-         -v ${clair_phased_vcf} \
-         -mc ${bam} \
-         -b  ${bam}  \
-         -ref ${reference_genome} \
-         -o "patmat" \
-         -p ${task.cpus} \
-         -dp 6 | tee stdout
-
-        # Parse the SNP identity line:
-        grep "reference heterozygous phased" stdout > snp_identity_check.txt
+        tabix ${clair_phased_vcf}
+        python3 /opt/PatMat/patmat/patmat.py \
+        --strand_vcf ${strandseq_phased_vcf}  \
+        --vcf ${clair_phased_vcf} \
+        --bam ${bam} \
+        --reference ${reference_genome} \
+        --output "patmat" \
+        -p ${task.cpus} \
+        -dp 6 | tee stdout
 
         # Log tool versions and containers
         cat <<-END_VERSIONS > versions.yml
         ---
         Process:"${task.process}"
         Container: "${task.container}"
-        patmat: \$( python3 /opt/PatMat-1.3.0/patmat/patmat.py --version )
+        patmat: \$( python3 /opt/PatMat/patmat/patmat.py --version )
         END_VERSIONS
     """
 }
