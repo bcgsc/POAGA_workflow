@@ -2,14 +2,31 @@
 nextflow.enable.dsl=2
 
 include {
-    ashleys_qc
-    calc_het_hom_discordance
     compress_haplotagged_bam
-    extract_variants_of_interest
+    compress_vcf
+} from './processes/compress'
+
+include {
+    calc_het_hom_discordance
     log_pipeline_version
+} from './processes/qc'
+
+include {
+    extract_variants_of_interest
+} from './processes/regions_of_interest'
+
+include {
     patmat
+} from './processes/patmat'
+
+include {
     prepare_whatshap_files
     sort_haplotagged_bam
+    whatshap_haplotag
+} from './processes/whatshap'
+
+include {
+    ashleys_qc
     strand_pass_fail_cells
     strandseq_bowtie
     strandseq_concat_fastq
@@ -17,9 +34,38 @@ include {
     strandseq_mark_duplicates
     strandseq_phase
     strandseq_tidy_reads
-    whatshap_haplotag
+} from './processes/strandseq'
 
-} from './poaga_processes.nf'
+
+def check_het_hom_discordance(patient, results) {
+    // Read file and skip header
+    def lines = results.readLines()
+    if (lines.size() < 2) {
+        println "Warning: HET-HOM file for patient ${patient} has insufficient data"
+        return false
+    }
+
+    // Get header to find Discordance column index
+    def header = lines[0].split('\t')
+    def valueColIdx = header.findIndexOf { it == 'Discordance' }
+
+    if (valueColIdx == -1) {
+        println "Warning: No 'Discordance' column found in result file for patient ${patient}"
+        return false
+    }
+
+    // Get value from second line
+    def value = lines[1].split('\t')[valueColIdx].toFloat()
+    println "Patient ${patient} HET-HOM discordance: ${value}"
+
+    // Compare with threshold
+    def passes = value <= params.het_hom_threshold
+    // Log filtered samples
+    if (!passes) {
+        println "Patient ${patient} filtered out due to HET-HOM discordance value: ${value}"
+    }
+    return passes
+}
 
 // HELP message
 if ( params.help ) {
@@ -115,8 +161,17 @@ workflow {
     calc_het_hom_discordance(input.join(strandseq_phase.out.vcf))
     ch_versions = ch_versions.mix(calc_het_hom_discordance.out.versions.take(1))
 
+    // Filter samples that failed het-hom check
+    clean_samples = calc_het_hom_discordance.out.het_hom_discordance
+        .filter { patient, results ->
+            return check_het_hom_discordance(patient, results)
+    }.map { patient, results -> patient }
+
+    filtered_vcfs = strandseq_phase.out.vcf
+        .join(clean_samples, by: 0)  // join by 1st element, get only clean samples.
+
     //patmat
-    patmat(input.join(strandseq_phase.out.vcf), params.reference_genome, params.reference_genome_idx)
+    patmat(input.join(filtered_vcfs), params.reference_genome, params.reference_genome_idx)
     ch_versions = ch_versions.mix(patmat.out.versions.take(1))
 
     //Haplotagging the BAM file with whatshap
