@@ -95,7 +95,6 @@ process strandseq_phase {
 process strandseq_concat_fastq {
     cpus 4
     label "mem12"
-    container "/gsc/www/bcgsc.ca/downloads/rcorbett/poaga.sif"
 
     input:
         tuple val(patient),
