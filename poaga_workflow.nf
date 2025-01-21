@@ -34,6 +34,7 @@ include {
     strandseq_mark_duplicates
     strandseq_phase
     strandseq_tidy_reads
+    write_chr_phasing_summary
 } from './processes/strandseq'
 
 
@@ -156,6 +157,10 @@ workflow {
     //strandseq_phase.R
     strandseq_phase(input.join(ashleys_qc.out.ashleys_pass_folder), params.chromosomes)
     ch_versions = ch_versions.mix(strandseq_phase.out.versions.take(1))
+
+    //chromosome phasing summary
+    write_chr_phasing_summary(strandseq_phase.out.chr_states)
+    ch_versions = ch_versions.mix(write_chr_phasing_summary.out.versions.take(1))
 
     //het-hom-discordance
     calc_het_hom_discordance(input.join(strandseq_phase.out.vcf))

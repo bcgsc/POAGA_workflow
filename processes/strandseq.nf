@@ -53,7 +53,9 @@ process strandseq_phase {
     cpus 16
     label "mem400"
     container "${params.singularity_folder}/patmat-1.4.0_dev.sif"
+
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "${patient}.strandseqphased.inv_aware.vcf"
+    publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "${patient}.chr-states.txt"
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "*", enabled: params.debug
 
     input:
@@ -67,6 +69,7 @@ process strandseq_phase {
 
 	output:
         tuple val("${patient}"), path("${patient}.strandseqphased.inv_aware.vcf"), emit: vcf
+        tuple val("${patient}"), path("${patient}.chr-states.txt"), emit: chr_states
         tuple val("${patient}"), path("*"), emit: strandseq_phase_all_output
         path("versions.yml"), emit: versions
 
@@ -81,6 +84,8 @@ process strandseq_phase {
         -n ${patient} \
         --chromosomes ${chromosomes} \
         ${clair3_vcf}
+
+        report-chr-states.R ${patient}.chr-states.txt
 
         # Log tool versions and containers
         cat <<-END_VERSIONS > versions.yml
@@ -326,3 +331,34 @@ process strand_pass_fail_cells {
     """
 }
 
+
+
+process write_chr_phasing_summary {
+    tag "${patient}"
+    cpus 4
+    label "mem12"
+    container "pedrofeijao/vcfpy:0.13.8"
+    publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy'
+
+    input:
+        tuple val(patient),
+            path(chr_states)
+
+	output:
+        tuple val(patient), path(OUT), emit: chr_phasing_summary
+        path("versions.yml"), emit: versions
+
+    script:
+    OUT="${patient}.chr_phasing_summary.txt"
+	"""
+        write_chr_states_summary.py ${chr_states} $OUT
+
+        # Log tool versions and containers
+        cat <<-END_VERSIONS > versions.yml
+        ---
+        Process:"${task.process}"
+        Container: "${task.container}"
+        python: \$( python --version 2>&1)
+        END_VERSIONS
+    """
+}
