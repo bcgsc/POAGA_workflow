@@ -37,6 +37,10 @@ include {
     write_chr_phasing_summary
 } from './processes/strandseq'
 
+include {
+    mpileup_strandseq
+    calc_discordance
+} from './processes/snp_concordance'
 
 def check_het_hom_discordance(patient, results) {
     // Read file and skip header
@@ -149,6 +153,13 @@ workflow {
     //implemented below. Does the basic aligning, tidying and read count qc for strand-seq
     strandseq(input)
     ch_versions = ch_versions.mix(strandseq.out.ch_versions)
+
+    // SNP concordance:
+    mpileup_strandseq(input.join(strandseq.out.pass_strandseq_bam_folder), params.snp_region)
+    ch_versions = ch_versions.mix(mpileup_strandseq.out.versions.take(1))
+
+    calc_discordance(mpileup_strandseq.out.vcf_files)
+    ch_versions = ch_versions.mix(calc_discordance.out.versions.take(1))
 
     //ashley's qc - scores the cells, returns folders with the cells that pass and fail
     ashleys_qc(input.join(strandseq.out.pass_strandseq_bam_folder), params.min_ashleys_qc_prob)
