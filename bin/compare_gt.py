@@ -96,7 +96,7 @@ def main(raw_arguments=None):
                 merged["concor"].value_counts(True).get(False, 0.0).round(5),
             )
         ],
-        columns=["Total", "Discordant", "P"],
+        columns=["Total", "DiscordantSites", "DiscordantP"],
     )
     df.to_csv(args.output, sep="\t", index=False)
 
