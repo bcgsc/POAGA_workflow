@@ -1,7 +1,6 @@
 process mpileup_strandseq {
     container "quay.io/biocontainers/bcftools:1.20--h8b25389_0"
     input:
-        // tuple val(patient), path(subnanovcf), path(bam_folder)
         tuple val(patient),
             path(strandseq_bam_folder),
             path(clair3_vcf),
