@@ -15,7 +15,7 @@ process mpileup_strandseq {
         tuple val(patient),
             path(NANO_OUT),
             path(SSEQ_OUT), emit: vcf_files
-        path("versions.yml"), emit: versions    
+        path("versions.yml"), emit: versions
     script:
         SSEQ_OUT="${patient}.sseq.subset.vcf.gz"
         NANO_OUT="${patient}.nano.subset.vcf.gz"
