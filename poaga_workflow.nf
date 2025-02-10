@@ -37,35 +37,57 @@ include {
     write_chr_phasing_summary
 } from './processes/strandseq'
 
+include {
+    mpileup_strandseq
+    calc_discordance
+} from './processes/snp_concordance'
 
-def check_het_hom_discordance(patient, results) {
+
+def extract_column(file, column_name) {
     // Read file and skip header
-    def lines = results.readLines()
-    if (lines.size() < 2) {
-        println "Warning: HET-HOM file for patient ${patient} has insufficient data"
-        return false
-    }
+    def lines = file.readLines()
 
     // Get header to find Discordance column index
     def header = lines[0].split('\t')
-    def valueColIdx = header.findIndexOf { it == 'Discordance' }
+    def valueColIdx = header.findIndexOf { it == column_name }
 
     if (valueColIdx == -1) {
-        println "Warning: No 'Discordance' column found in result file for patient ${patient}"
-        return false
+        log.info "ERROR: No '${column_name}' column found in file ${file}"
+        return -1
     }
-
     // Get value from second line
-    def value = lines[1].split('\t')[valueColIdx].toFloat()
-    println "Patient ${patient} HET-HOM discordance: ${value}"
+    return lines[1].split('\t')[valueColIdx].toFloat()
 
-    // Compare with threshold
-    def passes = value <= params.het_hom_threshold
+}
+
+def check_het_hom_discordance(patient, results) {
+    def value = extract_column(results, "Discordance")
+    log.info "Patient ${patient} HET-HOM discordance: ${value}"
+
+    // Compare with threshold (check for -1, meaning did not parse the file correctly)
+    def passes = (value != -1 && value <= params.het_hom_threshold)
+
     // Log filtered samples
     if (!passes) {
-        println "Patient ${patient} filtered out due to HET-HOM discordance value: ${value}"
+        log.info "Patient ${patient} filtered out due to HET-HOM discordance value: ${value}"
     }
     return passes
+}
+
+def check_snp_discordance(patient, discordance_file) {
+    def value = extract_column(discordance_file, "DiscordantP")
+    log.info "Patient ${patient} SNP discordance: ${value}"
+
+    // Compare with threshold (check for -1, meaning did not parse the file correctly)
+    def passes = (value != -1 && value <= params.snp_discordance_threshold)
+
+    // Log filtered samples
+    if (!passes) {
+        log.info "Patient ${patient} filtered out due to SNP discordance value: ${value}"
+    }
+    return passes
+
+
 }
 
 // HELP message
@@ -112,7 +134,7 @@ if ( params.help ) {
              |""".stripMargin()
 
     // Print the help with the stripped margin and exit
-    println(help)
+    log.info(help)
     exit(0)
 }
 
@@ -150,8 +172,24 @@ workflow {
     strandseq(input)
     ch_versions = ch_versions.mix(strandseq.out.ch_versions)
 
+    // SNP concordance:
+    mpileup_strandseq(input.join(strandseq.out.pass_strandseq_bam_folder), params.snp_region)
+    ch_versions = ch_versions.mix(mpileup_strandseq.out.versions.take(1))
+
+    calc_discordance(mpileup_strandseq.out.vcf_files)
+    ch_versions = ch_versions.mix(calc_discordance.out.versions.take(1))
+
+    // Filter samples that SNP concordance check
+    snp_concordant_samples = calc_discordance.out.snp_discordance
+        .filter { patient, discordance_file ->
+            return check_snp_discordance(patient, discordance_file)
+    }.map { patient, discordance_file -> patient }
+
+    strandseq_bam_folder = strandseq.out.pass_strandseq_bam_folder
+        .join(snp_concordant_samples, by: 0) // join to get snp concordant only
+
     //ashley's qc - scores the cells, returns folders with the cells that pass and fail
-    ashleys_qc(input.join(strandseq.out.pass_strandseq_bam_folder), params.min_ashleys_qc_prob)
+    ashleys_qc(input.join(strandseq_bam_folder), params.min_ashleys_qc_prob)
     ch_versions = ch_versions.mix(ashleys_qc.out.versions.take(1))
 
     //strandseq_phase.R
