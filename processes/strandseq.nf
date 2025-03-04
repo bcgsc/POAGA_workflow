@@ -57,6 +57,7 @@ process strandseq_phase {
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "${patient}.strandseqphased.inv_aware.vcf"
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "${patient}.chr-states.txt"
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "${patient}.inversions.above10kb.for_correction.bed"
+    publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "${patient}*composite.bam*"
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "*", enabled: params.debug
 
     input:
@@ -73,6 +74,11 @@ process strandseq_phase {
         tuple val("${patient}"), path("${patient}.chr-states.txt"), emit: chr_states
         tuple val("${patient}"), path("${patient}.inversions.above10kb.for_correction.bed"), emit: invertyper_output
         tuple val("${patient}"), path("*"), emit: strandseq_phase_all_output
+        tuple val("${patient}"),
+            path("${patient}_WC_composite.bam"),
+            path("${patient}_WC_composite.bam.bai"),
+            path("${patient}_WW_composite.bam"),
+            path("${patient}_WW_composite.bam.bai"), emit: composite_bams
         path("versions.yml"), emit: versions
 
     script:
@@ -92,6 +98,9 @@ process strandseq_phase {
         cp invertyper/*bed .
 
         report-chr-states.R ${patient}.chr-states.txt
+
+        generate-composite-bam.R invertyper ${patient}_
+
         # Log tool versions and containers
         cat <<-END_VERSIONS > versions.yml
         ---

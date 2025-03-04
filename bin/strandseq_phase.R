@@ -229,7 +229,7 @@ inversions <- invertyper_pipeline(
     soft_mask = args$soft_mask,
     chromosomes = args$chromosomes,
     numCPU = args$threads,
-    save_composite_files = FALSE,
+    save_composite_files = TRUE,
     write_browser_files = FALSE,
     discover_breakpointr_inversions = TRUE,
     breakpointr_prior = c(0.9, 0.05, 0.05),
