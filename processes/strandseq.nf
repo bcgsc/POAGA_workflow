@@ -75,14 +75,16 @@ process strandseq_phase {
         tuple val("${patient}"), path("${patient}.inversions.above10kb.for_correction.bed"), emit: invertyper_output
         tuple val("${patient}"), path("*"), emit: strandseq_phase_all_output
         tuple val("${patient}"),
-            path("${patient}_WC_composite.bam"),
-            path("${patient}_WC_composite.bam.bai"),
-            path("${patient}_WW_composite.bam"),
-            path("${patient}_WW_composite.bam.bai"), emit: composite_bams
+            path(WC_OUT),
+            path("${WC_OUT}.bai"),
+            path(WW_OUT),
+            path("${WW_OUT}.bai"), emit: composite_bams
         path("versions.yml"), emit: versions
 
     script:
         def STRANDSEQ_PHASE_VERSION="1.4.0dev"
+        WW_OUT="${patient}_WW_composite.bam"
+        WC_OUT="${patient}_WC_composite.bam"
 	"""
         strandseq_phase.R ${params.extra_strandseq_options} \
         -p TRUE \
@@ -99,7 +101,7 @@ process strandseq_phase {
 
         report-chr-states.R ${patient}.chr-states.txt
 
-        generate-composite-bam.R invertyper ${patient}_
+        generate-composite-bam.R invertyper ${WW_OUT} ${WC_OUT}
 
         # Log tool versions and containers
         cat <<-END_VERSIONS > versions.yml

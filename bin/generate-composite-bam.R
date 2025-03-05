@@ -4,10 +4,11 @@ library(GenomicAlignments)
 
 args <- commandArgs(T)
 dir <- args[1]
-output <- args[2]
+ww_output <- args[2]
+wc_output <- args[3]
 
 load(paste0(dir,"/WW_composite_file.RData"))
 load(paste0(dir,"/WC_composite_file.RData"))
 
-export(WW_composite_file, BamFile(paste0(output, "WW_composite.bam")))
-export(WC_composite_file, BamFile(paste0(output, "WC_composite.bam")))
+export(WW_composite_file, BamFile(ww_output))
+export(WC_composite_file, BamFile(wc_output))
