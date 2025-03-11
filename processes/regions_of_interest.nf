@@ -190,7 +190,7 @@ workflow extract_variants_of_interest {
         annotate_variants(variants_channel)
 
         // compress and index vcf to search variants
-        compress_vcf(pofo_vcf)
+        compress_vcf(pofo_vcf, "")
 
         // extract
         annotate_variants.out.variant_annotation
