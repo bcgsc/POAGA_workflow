@@ -39,13 +39,14 @@ process compress_haplotagged_bam {
 process compress_vcf {
     tag "${patient}"
     cpus 12
-    debug true
     memory "24 GB"
     container "quay.io/biocontainers/samtools:1.19.2--h50ea8bc_0"
+    publishDir "${params.output_folder}/${patient}/${publish_dir}", mode: 'copy', overwrite: true, enabled: "${ publish_dir != '' }"
 
     input:
         tuple val(patient),
             path(vcf)
+        val(publish_dir)
 
     output:
         tuple val(patient),
