@@ -3,7 +3,7 @@ nextflow.enable.dsl=2
 
 include {
     compress_haplotagged_bam
-    compress_vcf
+    compress_vcf as compress_patmat_vcf
 } from './processes/compress'
 
 include {
@@ -216,6 +216,9 @@ workflow {
     //patmat
     patmat(input.join(filtered_vcfs), params.reference_genome, params.reference_genome_idx)
     ch_versions = ch_versions.mix(patmat.out.versions.take(1))
+
+    compress_patmat_vcf(patmat.out.pofo_assignment_vcf, "POAGA")
+    ch_versions = ch_versions.mix(compress_patmat_vcf.out.versions.take(1))
 
     //Haplotagging the BAM file with whatshap
     prepare_whatshap_files(input.join(patmat.out.pofo_assignment_vcf))
