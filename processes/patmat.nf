@@ -9,10 +9,10 @@ process patmat {
     label "mem400"
     container "${params.singularity_folder}/patmat-1.4.0_dev.sif"
     // Main output
-    publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Assigned.vcf'
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Scores.tsv'
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Assigned_info.tsv'
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_CpG-Methylation-Status-at-DMRs.tsv'
+    publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: "*", enabled: params.debug
 
     input:
         tuple val(patient),
@@ -27,6 +27,7 @@ process patmat {
 
 	output:
         tuple val(patient), path("*"), emit: patmat_all_output
+        // VCF below is not published here, because bgzip+tabix later publishes it.
         tuple val(patient), path("patmat_PofO_Assigned.vcf"), emit: pofo_assignment_vcf
         tuple val(patient), path("patmat_PofO_Scores.tsv"), emit: pofo_scores
         tuple val(patient), path("patmat_CpG-Methylation-Status-at-DMRs.tsv"), emit: pofo_dmr_status
