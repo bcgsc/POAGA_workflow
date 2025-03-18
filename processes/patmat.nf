@@ -16,7 +16,6 @@ process patmat {
 
     input:
         tuple val(patient),
-            path(strandseq_bam_folder),
             path(clair_phased_vcf),
             path(bam),
             path(bai),
