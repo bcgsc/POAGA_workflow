@@ -45,6 +45,8 @@ process patmat {
         --vcf ${clair_phased_vcf} \
         --bam ${bam} \
         --reference ${reference_genome} \
+        --phased \
+        --include_supplementary \
         --output "patmat" \
         -p ${task.cpus} \
         -dp 6 | tee stdout
