@@ -11,12 +11,14 @@ process patmat {
     // Main output
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Scores.tsv'
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Assigned_info.tsv'
+    publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: '*_PofO_Assignment_SVs_info.tsv'
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_CpG-Methylation-Status-at-DMRs.tsv'
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: "*", enabled: params.debug
 
     input:
         tuple val(patient),
             path(clair_phased_vcf),
+            path(sniffles2_vcf),
             path(bam),
             path(bai),
             path(strandseq_phased_vcf)
@@ -26,10 +28,12 @@ process patmat {
 
 	output:
         tuple val(patient), path("*"), emit: patmat_all_output
-        // VCF below is not published here, because bgzip+tabix later publishes it.
+        // VCFs below are not published here, because compress_vcf process later publishes it.
         tuple val(patient), path("patmat_PofO_Assigned.vcf"), emit: pofo_assignment_vcf
+        tuple val(patient), path("*_PofO_Assignment_SVs.vcf"), emit: pofo_assignment_sv_vcf
         tuple val(patient), path("patmat_PofO_Scores.tsv"), emit: pofo_scores
         tuple val(patient), path("patmat_CpG-Methylation-Status-at-DMRs.tsv"), emit: pofo_dmr_status
+
         path("versions.yml"), emit: versions
 
     script:
@@ -37,6 +41,7 @@ process patmat {
         tabix ${clair_phased_vcf}
         python3 /opt/PatMat/patmat/patmat.py \
         --strand_vcf ${strandseq_phased_vcf}  \
+        --sv_vcf ${sniffles2_vcf} \
         --vcf ${clair_phased_vcf} \
         --bam ${bam} \
         --reference ${reference_genome} \

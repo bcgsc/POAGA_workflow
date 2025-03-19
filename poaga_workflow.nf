@@ -99,10 +99,11 @@ if ( params.help ) {
              |
              |Required arguments:
              |  --input_csv             Location of the input CSV file. Each row corresponds to a sample to be processed.
-             |                          The CSV file must have a header with 5 columns:
+             |                          The CSV file must have a header with 6 columns:
              |     - patient            Sample label.
              |     - strand_seq_fastq   Folder with the Strand-seq FastQ files for the sample.
              |     - clair3_vcf         Clair3 VCF output for the sample's Nanopore data.
+             |     - sniffles2_vcf      sniffles2 SV VCF output for the sample's Nanopore data.
              |     - bam                Nanopore BAM file.
              |     - bai                Index file for the Nanopore BAM file.
              |
@@ -166,6 +167,7 @@ workflow {
         .multiMap { row ->
             strandseq: tuple(row.patient,row.strand_seq_fastq)
             nanopore_vcf: tuple(row.patient, row.clair3_vcf)
+            nanopore_sv_vcf: tuple(row.patient, row.sniffles2_vcf)
             nanopore_bam: tuple(row.patient, row.bam, row.bai)
         }
 
@@ -221,6 +223,7 @@ workflow {
 
     //patmat
     patmat_channel = input.nanopore_vcf
+        .join(input.nanopore_sv_vcf)
         .join(input.nanopore_bam)
         .join(filtered_vcfs)
     pofo_assignment_vcf = patmat(
@@ -229,7 +232,9 @@ workflow {
         params.reference_genome_idx).pofo_assignment_vcf
     ch_versions = ch_versions.mix(patmat.out.versions.take(1))
 
-    compress_patmat_vcf(pofo_assignment_vcf, "POAGA")
+    vcf_to_compress = pofo_assignment_vcf
+        .mix(patmat.out.pofo_assignment_sv_vcf)
+    compress_patmat_vcf(vcf_to_compress, "POAGA")
     ch_versions = ch_versions.mix(compress_patmat_vcf.out.versions.take(1))
 
     //Haplotagging the BAM file with whatshap
