@@ -4,6 +4,7 @@ nextflow.enable.dsl=2
 include {
     compress_haplotagged_bam
     compress_vcf as compress_patmat_vcf
+    compress_vcf as compress_strandseq_phase_vcf
 } from './processes/compress'
 
 include {
@@ -212,6 +213,9 @@ workflow {
 
     filtered_vcfs = strandseq_phase.out.vcf
         .join(clean_samples, by: 0)  // join by 1st element, get only clean samples.
+
+    // compress strandseq VCF
+    compress_strandseq_phase_vcf(filtered_vcfs, "strandseqphase")
 
     //patmat
     patmat(input.join(filtered_vcfs), params.reference_genome, params.reference_genome_idx)
