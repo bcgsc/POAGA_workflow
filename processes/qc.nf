@@ -23,10 +23,7 @@ process calc_het_hom_discordance {
 
     input:
         tuple val(patient),
-            path(strandseq_bam_folder),
             path(clair_phased_vcf),
-            path(bam),
-            path(bai),
             path(strandseq_phased_vcf)
 
 	output:

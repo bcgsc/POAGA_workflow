@@ -10,10 +10,6 @@ process ashleys_qc {
 
     input:
         tuple val(patient),
-            path(strandseq_bam_folder),
-            path(clair3_vcf),
-            path(bam),
-            path(bai),
             path(strandseq_pass_bam_folder)
         val(pass_probability)
 
@@ -61,10 +57,7 @@ process strandseq_phase {
 
     input:
         tuple val(patient),
-            path(strandseq_bam_folder),
             path(clair3_vcf),
-            path(bam),
-            path(bai),
             path(ashleys_pass_bam_folder)
         val(chromosomes)
 
@@ -117,10 +110,7 @@ process strandseq_concat_fastq {
 
     input:
         tuple val(patient),
-            path(strandseq_folder),
-            path(clair3_vcf),
-            path(bam),
-            path(bai)
+            path(strandseq_folder)
 
 	output:
         tuple val("${patient}"), path("merged_fastqs/*"), emit:fastqs

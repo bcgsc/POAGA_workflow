@@ -9,8 +9,6 @@ process prepare_whatshap_files {
 
     input:
         tuple val(patient),
-            path(strandseq_fastq),
-            path(clair_vcf),
             path(bam),
             path(bai),
             path(pofo_assignment_vcf)

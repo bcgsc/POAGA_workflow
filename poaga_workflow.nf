@@ -100,10 +100,11 @@ if ( params.help ) {
              |
              |Required arguments:
              |  --input_csv             Location of the input CSV file. Each row corresponds to a sample to be processed.
-             |                          The CSV file must have a header with 5 columns:
+             |                          The CSV file must have a header with 6 columns:
              |     - patient            Sample label.
              |     - strand_seq_fastq   Folder with the Strand-seq FastQ files for the sample.
              |     - clair3_vcf         Clair3 VCF output for the sample's Nanopore data.
+             |     - sniffles2_vcf      sniffles2 SV VCF output for the sample's Nanopore data.
              |     - bam                Nanopore BAM file.
              |     - bai                Index file for the Nanopore BAM file.
              |
@@ -164,20 +165,26 @@ workflow {
     input = Channel
         .fromPath(params.input_csv)
         .splitCsv(header:true)
-        .map{ row-> tuple(row.patient,row.strand_seq_fastq,row.clair3_vcf,row.bam,row.bai) }
+        .multiMap { row ->
+            strandseq: tuple(row.patient,row.strand_seq_fastq)
+            nanopore_vcf: tuple(row.patient, row.clair3_vcf)
+            nanopore_sv_vcf: tuple(row.patient, row.sniffles2_vcf)
+            nanopore_bam: tuple(row.patient, row.bam, row.bai)
+        }
 
     // Log pipeline version:
     ch_versions = log_pipeline_version()
 
     //implemented below. Does the basic aligning, tidying and read count qc for strand-seq
-    strandseq(input)
+    strandseq(input.strandseq)
     ch_versions = ch_versions.mix(strandseq.out.ch_versions)
 
     // SNP concordance:
-    mpileup_strandseq(input.join(strandseq.out.pass_strandseq_bam_folder), params.snp_region)
+    snp_concordance_channel = input.nanopore_vcf.join(strandseq.out.pass_strandseq_bam_folder)
+    mpileup_vcf_files = mpileup_strandseq(snp_concordance_channel, params.snp_region).vcf_files
     ch_versions = ch_versions.mix(mpileup_strandseq.out.versions.take(1))
 
-    calc_discordance(mpileup_strandseq.out.vcf_files)
+    calc_discordance(mpileup_vcf_files)
     ch_versions = ch_versions.mix(calc_discordance.out.versions.take(1))
 
     // Filter samples that SNP concordance check
@@ -190,11 +197,12 @@ workflow {
         .join(snp_concordant_samples, by: 0) // join to get snp concordant only
 
     //ashley's qc - scores the cells, returns folders with the cells that pass and fail
-    ashleys_qc(input.join(strandseq_bam_folder), params.min_ashleys_qc_prob)
+    pass_bams = ashleys_qc(strandseq_bam_folder, params.min_ashleys_qc_prob).ashleys_pass_folder
     ch_versions = ch_versions.mix(ashleys_qc.out.versions.take(1))
 
     //strandseq_phase.R
-    strandseq_phase(input.join(ashleys_qc.out.ashleys_pass_folder), params.chromosomes)
+    strandseq_phase_channel = input.nanopore_vcf.join(pass_bams)
+    strandseq_phase(strandseq_phase_channel, params.chromosomes)
     ch_versions = ch_versions.mix(strandseq_phase.out.versions.take(1))
 
     //chromosome phasing summary
@@ -202,7 +210,7 @@ workflow {
     ch_versions = ch_versions.mix(write_chr_phasing_summary.out.versions.take(1))
 
     //het-hom-discordance
-    calc_het_hom_discordance(input.join(strandseq_phase.out.vcf))
+    calc_het_hom_discordance(input.nanopore_vcf.join(strandseq_phase.out.vcf))
     ch_versions = ch_versions.mix(calc_het_hom_discordance.out.versions.take(1))
 
     // Filter samples that failed het-hom check
@@ -218,27 +226,37 @@ workflow {
     compress_strandseq_phase_vcf(filtered_vcfs, "strandseqphase")
 
     //patmat
-    patmat(input.join(filtered_vcfs), params.reference_genome, params.reference_genome_idx)
+    patmat_channel = input.nanopore_vcf
+        .join(input.nanopore_sv_vcf)
+        .join(input.nanopore_bam)
+        .join(filtered_vcfs)
+    pofo_assignment_vcf = patmat(
+        patmat_channel,
+        params.reference_genome,
+        params.reference_genome_idx).pofo_assignment_vcf
     ch_versions = ch_versions.mix(patmat.out.versions.take(1))
 
-    compress_patmat_vcf(patmat.out.pofo_assignment_vcf, "POAGA")
+    vcf_to_compress = pofo_assignment_vcf
+        .mix(patmat.out.pofo_assignment_sv_vcf)
+    compress_patmat_vcf(vcf_to_compress, "POAGA")
     ch_versions = ch_versions.mix(compress_patmat_vcf.out.versions.take(1))
 
     //Haplotagging the BAM file with whatshap
-    prepare_whatshap_files(input.join(patmat.out.pofo_assignment_vcf))
+    prepare_whatshap_channel = input.nanopore_bam.join(pofo_assignment_vcf)
+    prep_files = prepare_whatshap_files(prepare_whatshap_channel).prep_files
     ch_versions = ch_versions.mix(prepare_whatshap_files.out.versions.take(1))
 
-    whatshap_haplotag(prepare_whatshap_files.out.prep_files, params.reference_genome, params.reference_genome_idx)
+    haplotagged_bam = whatshap_haplotag(prep_files, params.reference_genome, params.reference_genome_idx).haplotagged_bam
     ch_versions = ch_versions.mix(whatshap_haplotag.out.versions.take(1))
 
-    sort_haplotagged_bam(whatshap_haplotag.out.haplotagged_bam)
+    sort_haplotagged_bam(haplotagged_bam)
     ch_versions = ch_versions.mix(sort_haplotagged_bam.out.versions.take(1))
 
     //Compress BAM to CRAM
     compress_haplotagged_bam(sort_haplotagged_bam.out.haplotagged_sorted_bam, params.reference_genome)
     ch_versions = ch_versions.mix(sort_haplotagged_bam.out.versions.take(1))
 
-    // Variants of interest:
+    // Variants of interest:Not
     if ( params.variants ) {
         extract_variants_of_interest(
             params.variants,
@@ -268,13 +286,13 @@ returns:
 */
 workflow strandseq {
     take:
-        input
+        standseq_input
 
     main:
         ch_versions = Channel.empty()
 
         //concat_fastq
-        strandseq_concat_fastq(input)
+        strandseq_concat_fastq(standseq_input)
         ch_versions = ch_versions.mix(strandseq_concat_fastq.out.versions.take(1))
 
         //will process each fastq pair as its own job
