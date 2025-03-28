@@ -30,7 +30,6 @@ include {
     ashleys_qc
     strand_pass_fail_cells
     strandseq_bowtie
-    strandseq_concat_fastq
     strandseq_cutadapt
     strandseq_mark_duplicates
     strandseq_phase
@@ -91,6 +90,30 @@ def check_snp_discordance(patient, discordance_file) {
 
 }
 
+def build_strandseq_fastq_input(strandseq_input) {
+    // Given the strandseq input with tuples (patient, fastq_folder), find all cell fastq files in
+    // the folder and return a tuple (patient, cell_name, r1_file, r2_file, is_paired) where:
+    // - cell name: parsed cell name from R1 file
+    // - r1_file and r2_file: R1/R2 fastQ files, with R2 possibly missing, for SE libraries.
+    // - is_paired: boolean indicating if R2 file exists, which means a PE library.
+    return strandseq_input
+        .flatMap { patient, folder ->
+            // Find all R1 files
+            def r1_files = file("${folder}/*r48*_R1*.fastq.gz")
+
+            // Create a list of pairs, handling optional R2
+            return r1_files.collect { r1_file ->
+                // Get the cell id:
+                def cell_id = r1_file.name.toString().replaceAll(/_R1.+$/, '')
+                // Get the matching R2 file
+                def r2_file = file(r1_file.toString().replace('_R1', '_R2'))
+                // Check if R2 exists to determine if it is PE or SE:
+                def is_paired = r2_file.exists()
+
+                return tuple(patient, cell_id, r1_file, r2_file, is_paired)
+            }
+        }
+}
 // HELP message
 if ( params.help ) {
     help = """
@@ -172,11 +195,14 @@ workflow {
             nanopore_bam: tuple(row.patient, row.bam, row.bai)
         }
 
+    // "transform" the folder input in the channel to a fastq list input.
+    strandseq_reads = build_strandseq_fastq_input(input.strandseq)
+
     // Log pipeline version:
     ch_versions = log_pipeline_version()
 
     //implemented below. Does the basic aligning, tidying and read count qc for strand-seq
-    strandseq(input.strandseq)
+    strandseq(strandseq_reads)
     ch_versions = ch_versions.mix(strandseq.out.ch_versions)
 
     // SNP concordance:
@@ -286,17 +312,13 @@ returns:
 */
 workflow strandseq {
     take:
-        standseq_input
+        strandseq_reads
 
     main:
         ch_versions = Channel.empty()
 
-        //concat_fastq
-        strandseq_concat_fastq(standseq_input)
-        ch_versions = ch_versions.mix(strandseq_concat_fastq.out.versions.take(1))
-
         //will process each fastq pair as its own job
-        strandseq_cutadapt(strandseq_concat_fastq.out.fastqs.transpose())
+        strandseq_cutadapt(strandseq_reads)
         ch_versions = ch_versions.mix(strandseq_cutadapt.out.versions.take(1))
 
         //bowtie2 - outputs sam

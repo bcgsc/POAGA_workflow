@@ -104,41 +104,6 @@ process strandseq_phase {
     """
 }
 
-process strandseq_concat_fastq {
-    cpus 4
-    label "mem12"
-
-    input:
-        tuple val(patient),
-            path(strandseq_folder)
-
-	output:
-        tuple val("${patient}"), path("merged_fastqs/*"), emit:fastqs
-        path("versions.yml"), emit: versions
-
-    //Added the symlin to rename the input folder to something without underscores
-    script:
-	"""
-        mkdir merged_fastqs
-        for r1 in ${strandseq_folder}/*_R1*.fastq.gz
-        do
-            r2=\${r1//_R1/_R2}  # get R2 filename
-            prefix=\$( basename \$r1 | sed -r 's/_R1.*fastq.gz//')  # prefix (sample name before R{1,2})
-            OUT=merged_fastqs/\$prefix
-            mkdir -p \$OUT
-            cp \$r1 \$OUT/\$(basename \$r1)
-            cp \$r2 \$OUT/\$(basename \$r2)
-        done
-
-        # Log tool versions and container
-        cat <<-END_VERSIONS > versions.yml
-        ---
-        Process:"${task.process}"
-        Container: "${task.container}"
-        END_VERSIONS
-    """
-}
-
 process strandseq_cutadapt {
     cpus 4
     label "mem12"
