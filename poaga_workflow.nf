@@ -28,6 +28,7 @@ include {
 
 include {
     ashleys_qc
+    convert_fastq_pair_to_single
     strand_pass_fail_cells
     strandseq_bowtie
     strandseq_cutadapt
@@ -42,6 +43,35 @@ include {
     calc_discordance
 } from './processes/snp_concordance'
 
+def determine_if_analysis_is_mixed(is_paired_fastq) {
+    is_mixed_ch = is_paired_fastq
+        .groupTuple()
+        .map { patient, is_paired_list ->
+            def paired_count = is_paired_list.count(true)
+            def single_count = is_paired_list.count(false)
+            def is_mixed = (paired_count > 0 && single_count > 0)
+        return tuple(patient, is_mixed)
+        }
+    // Log if mixed:
+    is_mixed_ch
+        .filter { it[1] == true }
+        .view { "INFO: Analysis for patient ${it[0]} has mixed SE/PE libraries, treating all as SE."}
+
+    return is_mixed_ch
+}
+
+def print_pe_vs_counts(is_paired_fastq) {
+    is_paired_fastq
+        .groupTuple()
+            .map { patient, is_paired_end_list ->
+                def pe_count = is_paired_end_list.count(true)
+                def se_count = is_paired_end_list.count(false)
+                tuple(patient, pe_count, se_count)
+            }
+            .view { patient, pe_count, se_count ->
+                "Patient: ${patient}, Paired End libraries: ${pe_count}, Single End libraries: ${se_count}"
+            }
+}
 
 def extract_column(file, column_name) {
     // Read file and skip header
@@ -99,7 +129,7 @@ def build_strandseq_fastq_input(strandseq_input) {
     return strandseq_input
         .flatMap { patient, folder ->
             // Find all R1 files
-            def r1_files = file("${folder}/*r48*_R1*.fastq.gz")
+            def r1_files = file("${folder}/*_R1*.fastq.gz")
 
             // Create a list of pairs, handling optional R2
             return r1_files.collect { r1_file ->
@@ -227,7 +257,9 @@ workflow {
     ch_versions = ch_versions.mix(ashleys_qc.out.versions.take(1))
 
     //strandseq_phase.R
-    strandseq_phase_channel = input.nanopore_vcf.join(pass_bams)
+    strandseq_phase_channel = input.nanopore_vcf
+        .join(pass_bams)
+        .join(strandseq.out.is_paired_end)
     strandseq_phase(strandseq_phase_channel, params.chromosomes)
     ch_versions = ch_versions.mix(strandseq_phase.out.versions.take(1))
 
@@ -321,9 +353,52 @@ workflow strandseq {
         strandseq_cutadapt(strandseq_reads)
         ch_versions = ch_versions.mix(strandseq_cutadapt.out.versions.take(1))
 
+        // build is_paired channel, per fastq per patient.
+        is_paired_fastq = strandseq_cutadapt.out.fastqs
+            .map { patient, fastq, is_paired -> tuple(patient, is_paired) }
+
+        // log PE vs SE counts:
+        print_pe_vs_counts(is_paired_fastq)
+
+        // Determine full SE/PE vs mixed:
+        is_mixed_ch = determine_if_analysis_is_mixed(is_paired_fastq)
+
+        // Combine is_mixed channel with fastqs, to check if we need "conversion" from PE to SE
+        strandseq_cutadapt.out.fastqs
+            .combine(is_mixed_ch, by: 0)
+            .branch {
+                needs_conversion: it[2] == true && it[3] == true  // is_paired && is_mixed
+                already_single: it[2] == false                   // !is_paired
+                all_paired: it[2] == true && it[3] == false      // is_paired && !is_mixed
+            }
+            .set { fastq_branches }
+
+        // Convert paired files to single when needed
+        convert_fastq_pair_to_single(fastq_branches.needs_conversion)
+
+        // remove 'is_mixed' from non processing channel and merge all channels back together
+        already_single_standardized = fastq_branches.already_single
+            .map { patient, fastq, is_paired, is_mixed -> tuple(patient, fastq, is_paired) }
+        all_paired_standardized = fastq_branches.all_paired
+            .map { patient, fastq, is_paired, is_mixed -> tuple(patient, fastq, is_paired) }
+
+        // Merge all channels back together
+        already_single_standardized
+            .mix(all_paired_standardized)
+            .mix(convert_fastq_pair_to_single.out.fastq)
+            .set { unified_fastqs_ch }
+
         //bowtie2 - outputs sam
-        strandseq_bowtie(strandseq_cutadapt.out.fastqs, params.bowtie_index)
+        strandseq_bowtie(unified_fastqs_ch, params.bowtie_index)
         ch_versions = ch_versions.mix(strandseq_bowtie.out.versions.take(1))
+
+        // Channel with paired-end boolean per patient, to pass downstream
+        // If data had mixed SE/PE, each PE fastq pair was "merged" into a single SE fastq.
+        is_paired_end = unified_fastqs_ch
+            .map { tuple(it[0], it[2])}
+            .unique()
+        // should be tuple of (patient, true/false).
+
 
         //tidybam
         strandseq_tidy_reads(strandseq_bowtie.out.sam_file)
@@ -342,6 +417,7 @@ workflow strandseq {
         failed_strand_seq_list = strand_pass_fail_cells.out.failed_strand_seq_list
         pass_strandseq_bam_folder = strand_pass_fail_cells.out.pass_strandseq_bams
         fail_strandseq_bam_folder = strand_pass_fail_cells.out.fail_strandseq_bams
+        is_paired_end = is_paired_end
         ch_versions
 
 }
