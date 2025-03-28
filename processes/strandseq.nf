@@ -54,7 +54,6 @@ process strandseq_phase {
     label "mem400"
     container "${params.singularity_folder}/patmat-1.4.0_dev.sif"
 
-    publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "${patient}.strandseqphased.inv_aware.vcf"
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "${patient}.chr-states.txt"
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "invertyper"
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "${patient}*composite.bam*"
