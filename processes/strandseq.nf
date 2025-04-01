@@ -58,7 +58,8 @@ process strandseq_phase {
     input:
         tuple val(patient),
             path(clair3_vcf),
-            path(ashleys_pass_bam_folder)
+            path(ashleys_pass_bam_folder),
+            val(is_paired_end)
         val(chromosomes)
 
 	output:
@@ -74,12 +75,13 @@ process strandseq_phase {
         path("versions.yml"), emit: versions
 
     script:
-        def STRANDSEQ_PHASE_VERSION="1.4.0dev"
+        STRANDSEQ_PHASE_VERSION="1.4.0dev"
         WW_OUT="${patient}_WW_composite.bam"
         WC_OUT="${patient}_WC_composite.bam"
+        PAIRED="${is_paired_end.toString().toUpperCase()}"  // R bool is uppercase.
 	"""
         strandseq_phase.R ${params.extra_strandseq_options} \
-        -p TRUE \
+        --paired ${PAIRED} \
         -i ${ashleys_pass_bam_folder} \
         -o . \
         -t ${task.cpus} \
@@ -104,41 +106,6 @@ process strandseq_phase {
     """
 }
 
-process strandseq_concat_fastq {
-    cpus 4
-    label "mem12"
-
-    input:
-        tuple val(patient),
-            path(strandseq_folder)
-
-	output:
-        tuple val("${patient}"), path("merged_fastqs/*"), emit:fastqs
-        path("versions.yml"), emit: versions
-
-    //Added the symlin to rename the input folder to something without underscores
-    script:
-	"""
-        mkdir merged_fastqs
-        for r1 in ${strandseq_folder}/*_R1*.fastq.gz
-        do
-            r2=\${r1//_R1/_R2}  # get R2 filename
-            prefix=\$( basename \$r1 | sed -r 's/_R1.*fastq.gz//')  # prefix (sample name before R{1,2})
-            OUT=merged_fastqs/\$prefix
-            mkdir -p \$OUT
-            cp \$r1 \$OUT/\$(basename \$r1)
-            cp \$r2 \$OUT/\$(basename \$r2)
-        done
-
-        # Log tool versions and container
-        cat <<-END_VERSIONS > versions.yml
-        ---
-        Process:"${task.process}"
-        Container: "${task.container}"
-        END_VERSIONS
-    """
-}
-
 process strandseq_cutadapt {
     cpus 4
     label "mem12"
@@ -146,29 +113,46 @@ process strandseq_cutadapt {
 
     input:
         tuple val(patient),
-            path(fastq_folder)
+            val(cell_name),
+            path(fastq_r1),
+            path(fastq_r2),
+            val(is_paired)
 
 	output:
-        tuple val("${patient}"), path("*trimmed.1.fastq.gz"), path("*trimmed.2.fastq.gz"), emit: fastqs
+        tuple val("${patient}"), path("*trimmed.{1,2}.fastq.gz"), val(is_paired), emit: fastqs
         path("versions.yml"), emit: versions
 
     script:
+    if (is_paired) { // R2 is present, process as paired-end
+        println "Detected paired-end for ${cell_name}"
+        RUN_CUTADAPT = """
+            cutadapt \
+                -g AATGATACGGCGACCACCGAGATCTACACNNNNNNNNACACTCTTTCCCTACACGACGCTCTTCCGATCT \
+                -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNNNATCTCGTATGCCGTCTTCTGCTTG \
+                -G CAAGCAGAAGACGGCATACGAGATNNNNNNNNGTGACTGGAGTTCAGACGTGTGCTCTTCCGATCT \
+                -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTNNNNNNNNGTGTAGATCTCGGTGGTCGCCGTATCATT \
+                -o ${cell_name}_trimmed.1.fastq.gz \
+                -p ${cell_name}_trimmed.2.fastq.gz \
+                $fastq_r1 \
+                $fastq_r2 \
+                -m 30 \
+                -q 15
+        """
+    }
+    else { // No R2, process as single-ended:
+        println "Detected single-end for ${cell_name}"
+        RUN_CUTADAPT = """
+            cutadapt \
+                -g AATGATACGGCGACCACCGAGATCTACACNNNNNNNNACACTCTTTCCCTACACGACGCTCTTCCGATCT \
+                -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNNNATCTCGTATGCCGTCTTCTGCTTG \
+                -o ${cell_name}_trimmed.1.fastq.gz \
+                $fastq_r1 \
+                -m 30 \
+                -q 15
+        """
+    }
 	"""
-        read1=`ls ${fastq_folder}/*_R1*`
-        read2=`ls ${fastq_folder}/*_R2*`
-        cell_name=`ls -d ${fastq_folder}`
-
-        cutadapt \
-            -g AATGATACGGCGACCACCGAGATCTACACNNNNNNNNACACTCTTTCCCTACACGACGCTCTTCCGATCT \
-            -a AGATCGGAAGAGCACACGTCTGAACTCCAGTCACNNNNNNNNATCTCGTATGCCGTCTTCTGCTTG \
-            -G CAAGCAGAAGACGGCATACGAGATNNNNNNNNGTGACTGGAGTTCAGACGTGTGCTCTTCCGATCT \
-            -A AGATCGGAAGAGCGTCGTGTAGGGAAAGAGTGTNNNNNNNNGTGTAGATCTCGGTGGTCGCCGTATCATT \
-            -o \${cell_name}_trimmed.1.fastq.gz \
-            -p \${cell_name}_trimmed.2.fastq.gz \
-            \${read1} \
-            \${read2} \
-            -m 30 \
-            -q 15
+        ${RUN_CUTADAPT}
 
         # Log tool versions and containers
         cat <<-END_VERSIONS > versions.yml
@@ -188,19 +172,27 @@ process strandseq_bowtie {
 
     input:
         tuple val(patient),
-            path(fastq1),
-            path(fastq2)
+            path(fastq),  // possibly a list of 2, if paired-end files, otherwise a single file.
+            val(is_paired)
         path(bowtie_ref)
 
 	output:
-        tuple val("${patient}"), path("${fastq1.simpleName}.sam"), emit: sam_file
+        tuple val("${patient}"), path(SAM_OUTPUT), val(is_paired), emit: sam_file
         path("versions.yml"), emit: versions
 
     //had to use a folder for the reference and give the name here to get it available in the container
     script:
+    // Check if we have paired-end or single-end data:
+    if (is_paired) {
+        SAM_OUTPUT = "${fastq[0].simpleName}.sam"
+        FASTQ_INPUT = "-1 ${fastq[0]} -2 ${fastq[1]}"
+    }
+    else {
+        SAM_OUTPUT = "${fastq.simpleName}.sam"
+        FASTQ_INPUT = "-U ${fastq}"
+    }
 	"""
-        bowtie2 -x ${bowtie_ref}/hg38_no_alt -p ${task.cpus} -1 ${fastq1} -2 ${fastq2} -S ${fastq1.simpleName}.sam
-
+        bowtie2 -x ${bowtie_ref}/hg38_no_alt -p ${task.cpus} ${FASTQ_INPUT} -S ${SAM_OUTPUT}
 
         # Log tool versions and containers
         cat <<-END_VERSIONS > versions.yml
@@ -220,21 +212,33 @@ process strandseq_tidy_reads {
 
     input:
         tuple val(patient),
-           path(sam_file)
+           path(sam_file),
+           val(is_paired_end)
 
 	output:
-        tuple val("${patient}"), path("${sam_file.simpleName}.sorted.bam"), emit: bam_file
+        tuple val("${patient}"), path(BAM_OUTPUT), emit: bam_file
         path("versions.yml"), emit: versions
 
     //had to use a folder for the reference and give the name here to get it available in the container
     script:
+    INITIAL_SORTED_BAM="${sam_file.simpleName}.bam"
+    BAM_OUTPUT="${sam_file.simpleName}.tidy.bam"
+    CHROMOSOMES = ((1..22).collect { "chr${it}" } + ["chrX", "chrY"]).join(" ")
+    FILTER_CHR="samtools view -F2052 -q10 -h ${INITIAL_SORTED_BAM} ${CHROMOSOMES} | grep -v -E '@SQ.*chrUn|@SQ.*random|@SQ.*chrEBV'"
+    FIXMATE="samtools sort -n - | samtools fixmate -O bam - -"
+    SORT_TO_BAM_PAIRED="samtools sort - | samtools view -bh -f1 -o ${BAM_OUTPUT}"
+    SORT_TO_BAM_UNPAIRED="samtools sort - | samtools view -bh -o ${BAM_OUTPUT}"
+    if (is_paired_end) {
+        // Remove unmapped reads, secondary alignments, poor-quality reads, unwanted chromsomes, and then clean up any abandoned paired reads
+        RUN_SAMTOOLS="${FILTER_CHR} | ${FIXMATE} | ${SORT_TO_BAM_PAIRED}"
+    }
+    else {
+        //  Remove unmapped reads, secondary alignments, poor-quality reads, unwanted chromsomes.
+        RUN_SAMTOOLS="${FILTER_CHR} | ${SORT_TO_BAM_UNPAIRED}"
+    }
 	"""
-        chrs=\$(printf "chr%s " {1..22} X Y)
-        samtools view -bS ${sam_file} | samtools sort - -o ${sam_file.simpleName}.bam
-        samtools index ${sam_file.simpleName}.bam
-
-        # Remove unmapped reads, secondary alignments, poor-quality reads, unwanted chromsomes, and then clean up any abandoned paired reads
-        samtools view -F2052 -q10 -h ${sam_file.simpleName}.bam \$chrs | grep -v -E '@SQ.*chrUn|@SQ.*random|@SQ.*chrEBV' | samtools sort -n - | samtools fixmate -O bam - - | samtools sort - | samtools view -bh -f1 -o ${sam_file.simpleName}.sorted.bam
+        samtools view -bS ${sam_file} | samtools sort - -o ${INITIAL_SORTED_BAM} && samtools index ${INITIAL_SORTED_BAM}
+        ${RUN_SAMTOOLS}
 
         # Log tool versions and containers
         cat <<-END_VERSIONS > versions.yml
@@ -364,5 +368,23 @@ process write_chr_phasing_summary {
         Container: "${task.container}"
         python: \$( python --version 2>&1)
         END_VERSIONS
+    """
+}
+
+
+process convert_fastq_pair_to_single {
+    container 'quay.io/biocontainers/seqtk:1.3--h5bf99c6_3'
+    input:
+    tuple val(patient), path(fastq), val(is_paired), val(is_mixed)
+
+    output:
+    tuple val(patient), path(MERGED_FASTQ), val(MERGED_IS_PAIRED), emit: fastq
+
+    script:
+    MERGED_IS_PAIRED=false
+    MERGED_FASTQ="${fastq[0].baseName}.R1_R2_merged.fastq.gz"
+    """
+    # Merge R1 with reverse complement of R2 and gzip
+    cat <(zcat ${fastq[0]}) <(seqtk seq -r ${fastq[1]}) | gzip > ${MERGED_FASTQ}
     """
 }
