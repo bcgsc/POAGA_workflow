@@ -69,3 +69,33 @@ process compress_vcf {
     """
 }
 
+process filter_vcf_annotations {
+    tag "${patient}"
+    cpus 12
+    memory "24 GB"
+    container "quay.io/biocontainers/bcftools:1.20--h8b25389_0"
+
+    input:
+        tuple val(patient),
+            path(vcf)
+
+    output:
+        tuple val(patient),
+            path(OUT), emit: filtered_vcf
+        path("versions.yml"), emit: versions
+    script:
+    OUT="${vcf.simpleName}.filtered.vcf.gz"
+    """
+        bcftools annotate -x INFO $vcf | bgzip > $OUT
+
+        # Log tool versions and containers
+        cat <<-END_VERSIONS > versions.yml
+        ---
+        Process:"${task.process}"
+        Container: "${task.container}"
+        bctools: \$( bcftools --version 2>&1 | grep "^bcftools" )
+        bgzip: \$( bgzip --version 2>&1 | grep "^bgzip")
+        END_VERSIONS
+    """
+
+}

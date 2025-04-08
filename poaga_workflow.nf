@@ -5,6 +5,7 @@ include {
     compress_haplotagged_bam
     compress_vcf as compress_patmat_vcf
     compress_vcf as compress_strandseq_phase_vcf
+    filter_vcf_annotations
 } from './processes/compress'
 
 include {
@@ -235,8 +236,11 @@ workflow {
     strandseq(strandseq_reads)
     ch_versions = ch_versions.mix(strandseq.out.ch_versions)
 
+    // Filter clair3 VCF annotations, might break some tools:
+    nanopore_vcf = filter_vcf_annotations(input.nanopore_vcf).filtered_vcf
+
     // SNP concordance:
-    snp_concordance_channel = input.nanopore_vcf.join(strandseq.out.pass_strandseq_bam_folder)
+    snp_concordance_channel = nanopore_vcf.join(strandseq.out.pass_strandseq_bam_folder)
     mpileup_vcf_files = mpileup_strandseq(snp_concordance_channel, params.snp_region).vcf_files
     ch_versions = ch_versions.mix(mpileup_strandseq.out.versions.take(1))
 
@@ -257,7 +261,7 @@ workflow {
     ch_versions = ch_versions.mix(ashleys_qc.out.versions.take(1))
 
     //strandseq_phase.R
-    strandseq_phase_channel = input.nanopore_vcf
+    strandseq_phase_channel = nanopore_vcf
         .join(pass_bams)
         .join(strandseq.out.is_paired_end)
     strandseq_phase(strandseq_phase_channel, params.chromosomes)
@@ -268,7 +272,7 @@ workflow {
     ch_versions = ch_versions.mix(write_chr_phasing_summary.out.versions.take(1))
 
     //het-hom-discordance
-    calc_het_hom_discordance(input.nanopore_vcf.join(strandseq_phase.out.vcf))
+    calc_het_hom_discordance(nanopore_vcf.join(strandseq_phase.out.vcf))
     ch_versions = ch_versions.mix(calc_het_hom_discordance.out.versions.take(1))
 
     // Filter samples that failed het-hom check
@@ -284,7 +288,7 @@ workflow {
     compress_strandseq_phase_vcf(filtered_vcfs, "strandseqphase")
 
     //patmat
-    patmat_channel = input.nanopore_vcf
+    patmat_channel = nanopore_vcf
         .join(input.nanopore_sv_vcf)
         .join(input.nanopore_bam)
         .join(filtered_vcfs)
