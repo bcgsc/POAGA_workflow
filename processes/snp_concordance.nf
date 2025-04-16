@@ -35,6 +35,7 @@ process mpileup_strandseq {
 
 process calc_discordance {
     container "quay.io/biocontainers/pandas:2.2.1"
+    publishDir "${params.output_folder}/${patient}/qc_metrics", mode: 'copy'
 
     input:
         tuple val(patient),
