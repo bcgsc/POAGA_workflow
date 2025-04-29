@@ -47,7 +47,7 @@ process ashleys_qc {
 process strandseq_phase {
     tag "${patient}"
     cpus 16
-    label "mem400"
+    label "mem350"
     container "${params.singularity_folder}/patmat-1.4.0_dev.sif"
 
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "${patient}.chr-states.txt"

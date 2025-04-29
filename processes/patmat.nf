@@ -6,7 +6,7 @@ nextflow.enable.dsl=2
 process patmat {
     tag "${patient}"
     cpus 32
-    label "mem400"
+    label "mem350"
     container "${params.singularity_folder}/patmat-1.4.0_dev.sif"
     // Main output
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy', pattern: 'patmat_PofO_Scores.tsv'
