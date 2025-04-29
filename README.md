@@ -354,3 +354,14 @@ profiles {
   }
 }
 ```
+
+## Maintenance and Development
+
+This pipeline is designed to be maintainable and extensible. If you're interested in contributing to the development, understanding the pipeline architecture, or extending its functionality, please refer to our [Development Documentation](./DEVELOPMENT.md).
+
+The developer documentation includes:
+
+- Pipeline architecture and workflow overview
+- Process organization and data flow
+- Guide for adding new functionality
+- Configuration system details
