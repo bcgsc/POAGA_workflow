@@ -2,24 +2,149 @@
 nextflow.enable.dsl=2
 
 include {
-    ashleys_qc
-    calc_het_hom_discordance
     compress_haplotagged_bam
+    compress_vcf as compress_patmat_vcf
+    compress_vcf as compress_strandseq_phase_vcf
+    filter_vcf_annotations
+} from './processes/compress'
+
+include {
+    calc_het_hom_discordance
     log_pipeline_version
+} from './processes/qc'
+
+include {
+    extract_variants_of_interest
+} from './processes/regions_of_interest'
+
+include {
     patmat
+} from './processes/patmat'
+
+include {
     prepare_whatshap_files
     sort_haplotagged_bam
+    whatshap_haplotag
+} from './processes/whatshap'
+
+include {
+    ashleys_qc
+    convert_fastq_pair_to_single
     strand_pass_fail_cells
     strandseq_bowtie
-    strandseq_concat_fastq
     strandseq_cutadapt
     strandseq_mark_duplicates
     strandseq_phase
     strandseq_tidy_reads
-    whatshap_haplotag
+    write_chr_phasing_summary
+} from './processes/strandseq'
 
-} from './poaga_processes.nf'
+include {
+    mpileup_strandseq
+    calc_discordance
+} from './processes/snp_concordance'
 
+def determine_if_analysis_is_mixed(is_paired_fastq) {
+    is_mixed_ch = is_paired_fastq
+        .groupTuple()
+        .map { patient, is_paired_list ->
+            def paired_count = is_paired_list.count(true)
+            def single_count = is_paired_list.count(false)
+            def is_mixed = (paired_count > 0 && single_count > 0)
+        return tuple(patient, is_mixed)
+        }
+    // Log if mixed:
+    is_mixed_ch
+        .filter { it[1] == true }
+        .view { "INFO: Analysis for patient ${it[0]} has mixed SE/PE libraries, treating all as SE."}
+
+    return is_mixed_ch
+}
+
+def print_pe_vs_counts(is_paired_fastq) {
+    is_paired_fastq
+        .groupTuple()
+            .map { patient, is_paired_end_list ->
+                def pe_count = is_paired_end_list.count(true)
+                def se_count = is_paired_end_list.count(false)
+                tuple(patient, pe_count, se_count)
+            }
+            .view { patient, pe_count, se_count ->
+                "Patient: ${patient}, Paired End libraries: ${pe_count}, Single End libraries: ${se_count}"
+            }
+}
+
+def extract_column(file, column_name) {
+    // Read file and skip header
+    def lines = file.readLines()
+
+    // Get header to find Discordance column index
+    def header = lines[0].split('\t')
+    def valueColIdx = header.findIndexOf { it == column_name }
+
+    if (valueColIdx == -1) {
+        log.info "ERROR: No '${column_name}' column found in file ${file}"
+        return -1
+    }
+    // Get value from second line
+    return lines[1].split('\t')[valueColIdx].toFloat()
+
+}
+
+def check_het_hom_discordance(patient, results) {
+    def value = extract_column(results, "Discordance")
+    log.info "Patient ${patient} HET-HOM discordance: ${value}"
+
+    // Compare with threshold (check for -1, meaning did not parse the file correctly)
+    def passes = (value != -1 && value <= params.het_hom_threshold)
+
+    // Log filtered samples
+    if (!passes) {
+        log.info "Patient ${patient} filtered out due to HET-HOM discordance value: ${value}"
+    }
+    return passes
+}
+
+def check_snp_discordance(patient, discordance_file) {
+    def value = extract_column(discordance_file, "DiscordantP")
+    log.info "Patient ${patient} SNP discordance: ${value}"
+
+    // Compare with threshold (check for -1, meaning did not parse the file correctly)
+    def passes = (value != -1 && value <= params.snp_discordance_threshold)
+
+    // Log filtered samples
+    if (!passes) {
+        log.info "Patient ${patient} filtered out due to SNP discordance value: ${value}"
+    }
+    return passes
+
+
+}
+
+def build_strandseq_fastq_input(strandseq_input) {
+    // Given the strandseq input with tuples (patient, fastq_folder), find all cell fastq files in
+    // the folder and return a tuple (patient, cell_name, r1_file, r2_file, is_paired) where:
+    // - cell name: parsed cell name from R1 file
+    // - r1_file and r2_file: R1/R2 fastQ files, with R2 possibly missing, for SE libraries.
+    // - is_paired: boolean indicating if R2 file exists, which means a PE library.
+    return strandseq_input
+        .flatMap { patient, folder ->
+            // Find all R1 files
+            def r1_files = file("${folder}/*_R1*.fastq.gz")
+
+            // Create a list of pairs, handling optional R2
+            return r1_files.collect { r1_file ->
+                // Get the cell id:
+                def cell_id = r1_file.name.toString().replaceAll(/_R1.+$/, '')
+                // Get the matching R2 file
+                def r2_file = file(r1_file.toString().replace('_R1', '_R2'))
+                // Check if R2 exists to determine if it is PE or SE:
+                def is_paired = r2_file.exists()
+
+                return tuple(patient, cell_id, r1_file, r2_file, is_paired)
+            }
+        }
+}
 // HELP message
 if ( params.help ) {
     help = """
@@ -29,16 +154,21 @@ if ( params.help ) {
              |
              |Required arguments:
              |  --input_csv             Location of the input CSV file. Each row corresponds to a sample to be processed.
-             |                          The CSV file must have a header with 5 columns:
+             |                          The CSV file must have a header with 6 columns:
              |     - patient            Sample label.
              |     - strand_seq_fastq   Folder with the Strand-seq FastQ files for the sample.
              |     - clair3_vcf         Clair3 VCF output for the sample's Nanopore data.
+             |     - sniffles2_vcf      sniffles2 SV VCF output for the sample's Nanopore data.
              |     - bam                Nanopore BAM file.
              |     - bai                Index file for the Nanopore BAM file.
              |
              |  --output_folder         Output folder to store POAGA results.
              |
              |Optional arguments:
+             |  --variants              Variant CSV file(s). Each row corresponds to a variant of interest.
+             |                          The CSV file must have a header with 2 columns:
+             |     - patient            Sample label, matching the 'input_csv' label(s).
+             |     - variant            Variant in HGVS cDNA notation.
              |  --min_reads_threshold   Minimum number of high quality reads to pass a StrandSeq library file.
              |                [default: ${params.min_reads_threshold}]
              |  --chromosomes           Comma-separated list of chromosomes to process.
@@ -50,6 +180,7 @@ if ( params.help ) {
              |  -profile                Nextflow config profile(s) with pre-defined parameters (comma-separated profiles to use more than one).
              |                Available profiles include 'hg38_no_alt' (hg38 reference genome) and 'test' (run minimal dataset test)
              |
+             |
              |Useful Nextflow arguments:
              |  -resume                Does not execute steps that have already been executed with the same parameters. Useful for resuming
              |                         failed runs or re-runs with some parameter changes.
@@ -59,7 +190,7 @@ if ( params.help ) {
              |""".stripMargin()
 
     // Print the help with the stripped margin and exit
-    println(help)
+    log.info(help)
     exit(0)
 }
 
@@ -88,49 +219,121 @@ workflow {
     input = Channel
         .fromPath(params.input_csv)
         .splitCsv(header:true)
-        .map{ row-> tuple(row.patient,row.strand_seq_fastq,row.clair3_vcf,row.bam,row.bai) }
+        .multiMap { row ->
+            strandseq: tuple(row.patient,row.strand_seq_fastq)
+            nanopore_vcf: tuple(row.patient, row.clair3_vcf)
+            nanopore_sv_vcf: tuple(row.patient, row.sniffles2_vcf)
+            nanopore_bam: tuple(row.patient, row.bam, row.bai)
+        }
+
+    // "transform" the folder input in the channel to a fastq list input.
+    strandseq_reads = build_strandseq_fastq_input(input.strandseq)
 
     // Log pipeline version:
     ch_versions = log_pipeline_version()
 
     //implemented below. Does the basic aligning, tidying and read count qc for strand-seq
-    strandseq(input)
+    strandseq(strandseq_reads)
     ch_versions = ch_versions.mix(strandseq.out.ch_versions)
 
+    // Filter clair3 VCF annotations, might break some tools:
+    nanopore_vcf = filter_vcf_annotations(input.nanopore_vcf).filtered_vcf
+
+    // SNP concordance:
+    snp_concordance_channel = nanopore_vcf.join(strandseq.out.pass_strandseq_bam_folder)
+    mpileup_vcf_files = mpileup_strandseq(snp_concordance_channel, params.snp_region).vcf_files
+    ch_versions = ch_versions.mix(mpileup_strandseq.out.versions.take(1))
+
+    calc_discordance(mpileup_vcf_files)
+    ch_versions = ch_versions.mix(calc_discordance.out.versions.take(1))
+
+    // Filter samples that SNP concordance check
+    snp_concordant_samples = calc_discordance.out.snp_discordance
+        .filter { patient, discordance_file ->
+            return check_snp_discordance(patient, discordance_file)
+    }.map { patient, discordance_file -> patient }
+
+    strandseq_bam_folder = strandseq.out.pass_strandseq_bam_folder
+        .join(snp_concordant_samples, by: 0) // join to get snp concordant only
+
     //ashley's qc - scores the cells, returns folders with the cells that pass and fail
-    ashleys_qc(input.join(strandseq.out.pass_strandseq_bam_folder), params.min_ashleys_qc_prob)
+    pass_bams = ashleys_qc(strandseq_bam_folder, params.min_ashleys_qc_prob).ashleys_pass_folder
     ch_versions = ch_versions.mix(ashleys_qc.out.versions.take(1))
 
     //strandseq_phase.R
-    strandseq_phase(input.join(ashleys_qc.out.ashleys_pass_folder), params.chromosomes)
+    strandseq_phase_channel = nanopore_vcf
+        .join(pass_bams)
+        .join(strandseq.out.is_paired_end)
+    strandseq_phase(strandseq_phase_channel, params.chromosomes)
     ch_versions = ch_versions.mix(strandseq_phase.out.versions.take(1))
 
+    //chromosome phasing summary
+    write_chr_phasing_summary(strandseq_phase.out.chr_states)
+    ch_versions = ch_versions.mix(write_chr_phasing_summary.out.versions.take(1))
+
     //het-hom-discordance
-    calc_het_hom_discordance(input.join(strandseq_phase.out.vcf))
+    calc_het_hom_discordance(nanopore_vcf.join(strandseq_phase.out.vcf))
     ch_versions = ch_versions.mix(calc_het_hom_discordance.out.versions.take(1))
 
+    // Filter samples that failed het-hom check
+    clean_samples = calc_het_hom_discordance.out.het_hom_discordance
+        .filter { patient, results ->
+            return check_het_hom_discordance(patient, results)
+    }.map { patient, results -> patient }
+
+    filtered_vcfs = strandseq_phase.out.vcf
+        .join(clean_samples, by: 0)  // join by 1st element, get only clean samples.
+
+    // compress strandseq VCF
+    compress_strandseq_phase_vcf(filtered_vcfs, "strandseqphase")
+
     //patmat
-    patmat(input.join(strandseq_phase.out.vcf), params.reference_genome)
+    patmat_channel = nanopore_vcf
+        .join(input.nanopore_sv_vcf)
+        .join(input.nanopore_bam)
+        .join(filtered_vcfs)
+    pofo_assignment_vcf = patmat(
+        patmat_channel,
+        params.reference_genome,
+        params.reference_genome_idx).pofo_assignment_vcf
     ch_versions = ch_versions.mix(patmat.out.versions.take(1))
 
+    vcf_to_compress = pofo_assignment_vcf
+        .mix(patmat.out.pofo_assignment_sv_vcf)
+    compress_patmat_vcf(vcf_to_compress, "POAGA")
+    ch_versions = ch_versions.mix(compress_patmat_vcf.out.versions.take(1))
+
     //Haplotagging the BAM file with whatshap
-    prepare_whatshap_files(input.join(patmat.out.pofo_assignment_vcf))
+    prepare_whatshap_channel = input.nanopore_bam.join(pofo_assignment_vcf)
+    prep_files = prepare_whatshap_files(prepare_whatshap_channel).prep_files
     ch_versions = ch_versions.mix(prepare_whatshap_files.out.versions.take(1))
 
-    whatshap_haplotag(prepare_whatshap_files.out.prep_files, params.reference_genome, params.reference_genome_idx)
+    haplotagged_bam = whatshap_haplotag(prep_files, params.reference_genome, params.reference_genome_idx).haplotagged_bam
     ch_versions = ch_versions.mix(whatshap_haplotag.out.versions.take(1))
 
-    sort_haplotagged_bam(whatshap_haplotag.out.haplotagged_bam)
+    sort_haplotagged_bam(haplotagged_bam)
     ch_versions = ch_versions.mix(sort_haplotagged_bam.out.versions.take(1))
 
     //Compress BAM to CRAM
     compress_haplotagged_bam(sort_haplotagged_bam.out.haplotagged_sorted_bam, params.reference_genome)
     ch_versions = ch_versions.mix(sort_haplotagged_bam.out.versions.take(1))
 
+    // Variants of interest:Not
+    if ( params.variants ) {
+        extract_variants_of_interest(
+            params.variants,
+            patmat.out.pofo_assignment_vcf,
+            patmat.out.pofo_scores,
+            patmat.out.pofo_dmr_status,
+            Channel.fromPath("${projectDir}/assets/Imprinted_DMR_List_V1.tsv"),
+            sort_haplotagged_bam.out.haplotagged_sorted_bam
+        )
+        ch_versions = ch_versions.mix(extract_variants_of_interest.out.ch_versions)
+    }
+
     // Merge and publish logs
     ch_versions.unique().collectFile(name: params.logfile, storeDir: params.output_folder)
 }
-
 
 /*
 Takes care of the preliminary strand-seq analysis including:
@@ -145,22 +348,61 @@ returns:
 */
 workflow strandseq {
     take:
-        input
+        strandseq_reads
 
     main:
         ch_versions = Channel.empty()
 
-        //concat_fastq
-        strandseq_concat_fastq(input)
-        ch_versions = ch_versions.mix(strandseq_concat_fastq.out.versions.take(1))
-
         //will process each fastq pair as its own job
-        strandseq_cutadapt(strandseq_concat_fastq.out.fastqs.transpose())
+        strandseq_cutadapt(strandseq_reads)
         ch_versions = ch_versions.mix(strandseq_cutadapt.out.versions.take(1))
 
+        // build is_paired channel, per fastq per patient.
+        is_paired_fastq = strandseq_cutadapt.out.fastqs
+            .map { patient, fastq, is_paired -> tuple(patient, is_paired) }
+
+        // log PE vs SE counts:
+        print_pe_vs_counts(is_paired_fastq)
+
+        // Determine full SE/PE vs mixed:
+        is_mixed_ch = determine_if_analysis_is_mixed(is_paired_fastq)
+
+        // Combine is_mixed channel with fastqs, to check if we need "conversion" from PE to SE
+        strandseq_cutadapt.out.fastqs
+            .combine(is_mixed_ch, by: 0)
+            .branch {
+                needs_conversion: it[2] == true && it[3] == true  // is_paired && is_mixed
+                already_single: it[2] == false                   // !is_paired
+                all_paired: it[2] == true && it[3] == false      // is_paired && !is_mixed
+            }
+            .set { fastq_branches }
+
+        // Convert paired files to single when needed
+        convert_fastq_pair_to_single(fastq_branches.needs_conversion)
+
+        // remove 'is_mixed' from non processing channel and merge all channels back together
+        already_single_standardized = fastq_branches.already_single
+            .map { patient, fastq, is_paired, is_mixed -> tuple(patient, fastq, is_paired) }
+        all_paired_standardized = fastq_branches.all_paired
+            .map { patient, fastq, is_paired, is_mixed -> tuple(patient, fastq, is_paired) }
+
+        // Merge all channels back together
+        already_single_standardized
+            .mix(all_paired_standardized)
+            .mix(convert_fastq_pair_to_single.out.fastq)
+            .set { unified_fastqs_ch }
+
         //bowtie2 - outputs sam
-        strandseq_bowtie(strandseq_cutadapt.out.fastqs, params.bowtie_index)
+        strandseq_bowtie(unified_fastqs_ch, params.bowtie_index)
         ch_versions = ch_versions.mix(strandseq_bowtie.out.versions.take(1))
+
+        // Channel with paired-end boolean per patient, to pass downstream
+        // If data had mixed SE/PE, each PE fastq pair was "merged" into a single SE fastq.
+        is_paired_end = unified_fastqs_ch
+            .map { tuple(it[0], it[2])}
+            .unique()
+        // should be tuple of (patient, true/false).
+
 
         //tidybam
         strandseq_tidy_reads(strandseq_bowtie.out.sam_file)
@@ -179,6 +421,7 @@ workflow strandseq {
         failed_strand_seq_list = strand_pass_fail_cells.out.failed_strand_seq_list
         pass_strandseq_bam_folder = strand_pass_fail_cells.out.pass_strandseq_bams
         fail_strandseq_bam_folder = strand_pass_fail_cells.out.fail_strandseq_bams
+        is_paired_end = is_paired_end
         ch_versions
 
 }
