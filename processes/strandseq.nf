@@ -6,7 +6,7 @@ process ashleys_qc {
     cpus 24
     label "mem256"
     container "quay.io/pedrofeijao/ashleys-qc:v0.2.0"
-    publishDir "${params.output_folder}/${patient}/ashleys_qc", mode: 'copy', pattern: '{fail,pass,quality.txt}'
+    publishDir "${params.output_folder}/${patient}/ashleys_qc", mode: 'copy', pattern: '{fail,pass,quality.txt}', enabled: params.debug
 
     input:
         tuple val(patient),
@@ -50,9 +50,6 @@ process strandseq_phase {
     label "mem350"
     container "${params.singularity_folder}/patmat-1.4.0_dev.sif"
 
-    publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "${patient}.chr-states.txt"
-    publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "invertyper"
-    publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "${patient}*composite.bam*"
     publishDir "${params.output_folder}/${patient}/strandseqphase", mode: 'copy', pattern: "*", enabled: params.debug
 
     input:
