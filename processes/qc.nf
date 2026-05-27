@@ -1,9 +1,10 @@
 #!/usr/bin/env nextflow
-nextflow.enable.dsl=2
+nextflow.enable.dsl = 2
 
 process log_pipeline_version {
     output:
-        path("versions.yml"), emit: versions
+    path ("versions.yml"), emit: versions
+
     script:
     """
         cat <<-END_VERSIONS > versions.yml
@@ -22,13 +23,11 @@ process calc_het_hom_discordance {
     publishDir "${params.output_folder}/${patient}/qc_metrics", mode: 'copy'
 
     input:
-        tuple val(patient),
-            path(clair_phased_vcf),
-            path(strandseq_phased_vcf)
+    tuple val(patient), path(clair_phased_vcf), path(strandseq_phased_vcf)
 
-	output:
-        tuple val("${patient}"), path("het_hom_discordance.txt"), emit: het_hom_discordance
-        path("versions.yml"), emit: versions
+    output:
+    tuple val("${patient}"), path("het_hom_discordance.txt"), emit: het_hom_discordance
+    path ("versions.yml"), emit: versions
 
     script:
     """
@@ -49,5 +48,4 @@ process calc_het_hom_discordance {
         bctools: \$( bcftools --version 2>&1 | grep "^bcftools" )
         END_VERSIONS
    """
-
 }
