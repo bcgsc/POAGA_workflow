@@ -1,5 +1,5 @@
 #!/usr/bin/env nextflow
-nextflow.enable.dsl=2
+nextflow.enable.dsl = 2
 
 
 process compress_haplotagged_bam {
@@ -9,20 +9,17 @@ process compress_haplotagged_bam {
     container "quay.io/biocontainers/samtools:1.19.2--h50ea8bc_0"
     publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy'
 
-
     input:
-        tuple val(patient),
-            path(bam),
-            path(bai)
-        path reference_genome
+    tuple val(patient), path(bam), path(bai)
+    path reference_genome
 
-	output:
-        tuple val("${patient}"), path("PofO_HaploTagged.sorted.cram"), path("PofO_HaploTagged.sorted.cram.crai"), emit: cram
-        path("versions.yml"), emit: versions
+    output:
+    tuple val("${patient}"), path("PofO_HaploTagged.sorted.cram"), path("PofO_HaploTagged.sorted.cram.crai"), emit: cram
+    path ("versions.yml"), emit: versions
 
     script:
-	"""
-        samtools view -@ ${task.cpus} -O CRAM,store_md=1,store_nm=1 -T ${reference_genome} $bam -o PofO_HaploTagged.sorted.cram
+    """
+        samtools view -@ ${task.cpus} -O CRAM,store_md=1,store_nm=1 -T ${reference_genome} ${bam} -o PofO_HaploTagged.sorted.cram
         samtools index -@ ${task.cpus} PofO_HaploTagged.sorted.cram
 
         # Log tool versions and containers
@@ -41,21 +38,19 @@ process compress_vcf {
     cpus 12
     memory "24 GB"
     container "quay.io/biocontainers/samtools:1.19.2--h50ea8bc_0"
-    publishDir "${params.output_folder}/${patient}/${publish_dir}", mode: 'copy', overwrite: true, enabled: "${ publish_dir != '' }"
+    publishDir "${params.output_folder}/${patient}/${publish_dir}", mode: 'copy', overwrite: true, enabled: "${publish_dir != ''}"
 
     input:
-        tuple val(patient),
-            path(vcf)
-        val(publish_dir)
+    tuple val(patient), path(vcf)
+    val publish_dir
 
     output:
-        tuple val(patient),
-            path("${vcf}.gz"),
-            path("${vcf}.gz.tbi"), emit: compressed_vcf
-        path("versions.yml"), emit: versions
+    tuple val(patient), path("${vcf}.gz"), path("${vcf}.gz.tbi"), emit: compressed_vcf
+    path ("versions.yml"), emit: versions
+
     script:
     """
-        bgzip $vcf
+        bgzip ${vcf}
         tabix ${vcf}.gz
 
         # Log tool versions and containers
@@ -76,17 +71,16 @@ process filter_vcf_annotations {
     container "quay.io/biocontainers/bcftools:1.20--h8b25389_0"
 
     input:
-        tuple val(patient),
-            path(vcf)
+    tuple val(patient), path(vcf)
 
     output:
-        tuple val(patient),
-            path(OUT), emit: filtered_vcf
-        path("versions.yml"), emit: versions
+    tuple val(patient), path(OUT), emit: filtered_vcf
+    path ("versions.yml"), emit: versions
+
     script:
-    OUT="${vcf.simpleName}.filtered.vcf.gz"
+    OUT = "${vcf.simpleName}.filtered.vcf.gz"
     """
-        bcftools annotate -x INFO $vcf | bgzip > $OUT
+        bcftools annotate -x INFO ${vcf} | bgzip > ${OUT}
 
         # Log tool versions and containers
         cat <<-END_VERSIONS > versions.yml
@@ -97,5 +91,4 @@ process filter_vcf_annotations {
         bgzip: \$( bgzip --version 2>&1 | grep "^bgzip")
         END_VERSIONS
     """
-
 }
