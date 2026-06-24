@@ -238,7 +238,7 @@ process strandseq_tidy_reads {
 //samtools says we're missing "ms" tags evening though fixmate is run on the bam
 process strandseq_mark_duplicates {
     cpus 4
-    memory "12 GB"
+    label "mem12"
     container "quay.io/biocontainers/picard:2.26.10--hdfd78af_0"
 
     input:
