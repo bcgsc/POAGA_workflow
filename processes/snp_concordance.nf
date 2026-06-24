@@ -3,7 +3,7 @@ process mpileup_strandseq {
 
     input:
     tuple val(patient), path(clair3_vcf), path(strandseq_pass_bam_folder)
-    val region
+    path region
 
     output:
     tuple val(patient), path(NANO_OUT), path(SSEQ_OUT), emit: vcf_files
@@ -14,8 +14,8 @@ process mpileup_strandseq {
     NANO_OUT = "${patient}.nano.subset.vcf.gz"
     """
         bcftools index ${clair3_vcf}
-        bcftools view -Oz -r ${region} -o ${NANO_OUT} ${clair3_vcf}
-        bcftools mpileup --no-reference -Q 30 -r ${region} ${strandseq_pass_bam_folder}/*bam \
+        bcftools view -Oz -R ${region} -o ${NANO_OUT} ${clair3_vcf}
+        bcftools mpileup --no-reference -Q 30 -R ${region} ${strandseq_pass_bam_folder}/*bam \
             | bcftools view -G -AA -H -a \
             | awk '{ if (\$5 !="." ) print \$1"\t"\$2"\t"\$5}' \
             | gzip > ${SSEQ_OUT}
@@ -31,6 +31,7 @@ process mpileup_strandseq {
 }
 
 process calc_discordance {
+    label "mem32"
     container "quay.io/biocontainers/pandas:2.2.1"
     publishDir "${params.output_folder}/${patient}/qc_metrics", mode: 'copy'
 
