@@ -141,7 +141,7 @@ nextflow run poaga_workflow.nf \
 - `--min_ashleys_qc_prob`: Minimum probability score for Strand-seq library QC (default: 0.5)
 - `--het_hom_threshold`: Maximum allowed het-hom discordance value (default: 0.03)
 - `--snp_discordance_threshold`: Maximum allowed SNP discordance value (default: 0.03)
-- `--snp_region`: Region for SNP concordance analysis (default: "chr1:1000000-10000000")
+- `--snp_region`: Region/BED file for SNP concordance analysis (default: `${projectDir}/assets/snp_regions.bed`)
 - `--flanking_region_size`: Size of flanking region for variant analysis in base pairs (default: 10000)
 - `--extra_strandseq_options`: Additional options for Strand-seq processing
 

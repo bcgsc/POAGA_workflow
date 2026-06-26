@@ -142,7 +142,8 @@ samples_file        : ${params.input_csv}
 
     // SNP concordance:
     snp_concordance_channel = nanopore_vcf.join(strandseq.out.pass_strandseq_bam_folder)
-    mpileup_vcf_files = mpileup_strandseq(snp_concordance_channel, params.snp_region).vcf_files
+    snp_region_file = channel.fromPath(params.snp_region, checkIfExists: true)
+    mpileup_vcf_files = mpileup_strandseq(snp_concordance_channel, snp_region_file).vcf_files
     ch_versions = ch_versions.mix(mpileup_strandseq.out.versions.take(1))
 
     calc_discordance(mpileup_vcf_files)
