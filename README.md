@@ -60,7 +60,7 @@ sample1,NM_000492:c.3909C>G
 sample2,NM_000059:c.6275_6276delTT
 ```
 
-The pipeline also requires a list of imprinted DMR (Differentially Methylated Regions) which should be available at `${projectDir}/assets/Imprinted_DMR_List_V1.tsv`.
+The pipeline also requires a list of imprinted DMR (Differentially Methylated Regions), configured with `--idmr_regions_file` (default: `${projectDir}/assets/Imprinted_DMR_List_V1.tsv`).
 
 ## Usage
 
@@ -136,6 +136,7 @@ nextflow run poaga_workflow.nf \
 ### Optional Parameters
 
 - `--variants`: CSV file(s) with variants of interest in HGVS cDNA notation
+- `--idmr_regions_file`: Path to iDMR list TSV used during variants-of-interest extraction (default: `${projectDir}/assets/Imprinted_DMR_List_V1.tsv`)
 - `--min_reads_threshold`: Minimum number of high-quality reads to pass a StrandSeq library (default: 10000)
 - `--chromosomes`: Comma-separated list of chromosomes to process (default: all autosomes)
 - `--min_ashleys_qc_prob`: Minimum probability score for Strand-seq library QC (default: 0.5)
