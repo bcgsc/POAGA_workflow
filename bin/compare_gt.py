@@ -93,7 +93,7 @@ def main(raw_arguments=None):
             (
                 merged["concor"].shape[0],
                 merged["concor"].value_counts().get(False),
-                merged["concor"].value_counts(True).get(False, 0.0).round(5),
+                round(merged["concor"].value_counts(True).get(False, 0.0), 5),
             )
         ],
         columns=["Total", "DiscordantSites", "DiscordantP"],
