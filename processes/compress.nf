@@ -33,6 +33,35 @@ process compress_haplotagged_bam {
 }
 
 
+process calculate_bamstats {
+    tag "${patient}"
+    cpus 12
+    label "mem64"
+    publishDir "${params.output_folder}/${patient}/POAGA", mode: 'copy'
+
+    input:
+    tuple val(patient), path(bam), path(bai)
+    path reference_genome
+
+    output:
+    tuple val("${patient}"), path("PofO_HaploTagged.sorted.cram.bamstat.txt")
+    path ("versions.yml"), emit: versions
+
+    script:
+    """
+        /gsc/QA-bio/sbs-solexa/opt/linux-x86_64/bamStats-0.4.0 -t ${task.cpus} -g 2934876451 ${bam} > PofO_HaploTagged.sorted.cram.bamstat.txt
+
+        # Log tool versions and containers
+        cat <<-END_VERSIONS > versions.yml
+        ---
+        Process:"${task.process}"
+        # Container: "${task.container}"
+        sambamba: \$(/gsc/QA-bio/sbs-solexa/opt/linux-x86_64/bamStats-0.4.0 2>&1  | grep "^sambamba")
+        END_VERSIONS
+    """
+}
+
+
 process compress_vcf {
     tag "${patient}"
     cpus 12

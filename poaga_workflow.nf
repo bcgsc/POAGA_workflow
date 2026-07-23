@@ -3,6 +3,7 @@ nextflow.enable.dsl = 2
 
 include {
     compress_haplotagged_bam ;
+    calculate_bamstats ;
     compress_vcf as compress_patmat_vcf ;
     compress_vcf as compress_strandseq_phase_vcf ;
     filter_vcf_annotations
@@ -222,6 +223,9 @@ samples_file        : ${params.input_csv}
     ch_versions = ch_versions.mix(sort_haplotagged_bam.out.versions.take(1))
 
     //Compress BAM to CRAM
+    calculate_bamstats(sort_haplotagged_bam.out.haplotagged_sorted_bam, params.reference_genome)
+    ch_versions = ch_versions.mix(calculate_bamstats.out.versions.take(1))
+
     compress_haplotagged_bam(sort_haplotagged_bam.out.haplotagged_sorted_bam, params.reference_genome)
     ch_versions = ch_versions.mix(sort_haplotagged_bam.out.versions.take(1))
 
