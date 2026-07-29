@@ -61,6 +61,7 @@ workflow extract_variants_of_interest {
 }
 
 process annotate_variants {
+    label "variants_of_interest"
     tag "${patient}"
     cpus 12
     debug true
@@ -91,6 +92,7 @@ process annotate_variants {
 
 
 process extract_variants {
+    label "variants_of_interest"
     tag "${patient}"
     cpus 12
     memory "24 GB"
@@ -121,6 +123,7 @@ process extract_variants {
 }
 
 process parse_regions_of_interest {
+    label "variants_of_interest"
     tag "${patient}"
     cpus 12
     memory "24 GB"
@@ -149,6 +152,7 @@ process parse_regions_of_interest {
 }
 
 process subset_regions_of_interest_bam {
+    label "variants_of_interest"
     tag "${patient}"
     cpus 24
     memory "24 GB"
@@ -178,6 +182,7 @@ process subset_regions_of_interest_bam {
 }
 
 process subset_pofo_methylation_of_interest {
+    label "variants_of_interest"
     tag "${patient}"
     cpus 24
     memory "24 GB"
