@@ -75,6 +75,8 @@ workflow {
              |                          The CSV file must have a header with 2 columns:
              |     - patient            Sample label, matching the 'input_csv' label(s).
              |     - variant            Variant in HGVS cDNA notation.
+             |  --idmr_regions_file     Path to iDMR list TSV file used for variant-of-interest extraction.
+             |                [default: ${params.idmr_regions_file}]
              |  --min_reads_threshold   Minimum number of high quality reads to pass a StrandSeq library file.
              |                [default: ${params.min_reads_threshold}]
              |  --chromosomes           Comma-separated list of chromosomes to process.
@@ -200,6 +202,7 @@ samples_file        : ${params.input_csv}
         patmat_channel,
         params.reference_genome,
         params.reference_genome_idx,
+        channel.fromPath(params.idmr_regions_file, checkIfExists: true),
     ).pofo_assignment_vcf
     ch_versions = ch_versions.mix(patmat.out.versions.take(1))
 
@@ -229,7 +232,7 @@ samples_file        : ${params.input_csv}
             patmat.out.pofo_assignment_vcf,
             patmat.out.pofo_scores,
             patmat.out.pofo_dmr_status,
-            Channel.fromPath("${projectDir}/assets/Imprinted_DMR_List_V1.tsv"),
+            channel.fromPath(params.idmr_regions_file, checkIfExists: true),
             sort_haplotagged_bam.out.haplotagged_sorted_bam,
         )
         ch_versions = ch_versions.mix(extract_variants_of_interest.out.ch_versions)

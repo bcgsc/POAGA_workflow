@@ -19,6 +19,7 @@ process patmat {
     tuple val(patient), path(clair_phased_vcf), path(sniffles2_vcf), path(bam), path(bai), path(strandseq_phased_vcf)
     path reference_genome
     path reference_genome_idx
+    path idmr_regions_file
 
     output:
     tuple val(patient), path("*"), emit: patmat_all_output
@@ -42,6 +43,7 @@ process patmat {
         --phased \
         --include_supplementary \
         --output "patmat" \
+        --known_dmr ${idmr_regions_file} \
         -p ${task.cpus} \
         -dp 6 | tee stdout
 

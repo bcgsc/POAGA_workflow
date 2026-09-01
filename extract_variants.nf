@@ -37,6 +37,10 @@ workflow {
              |
              |  --output_folder         Output folder to store results.
              |
+             | Optional arguments:
+             |  --idmr_regions_file     Path to iDMR list TSV file used for variant-of-interest extraction.
+             |                [default: ${params.idmr_regions_file}]
+             |
              |""".stripMargin()
 
         // Print the help with the stripped margin and exit
@@ -103,7 +107,7 @@ variants            : ${params.variants}
         pofo_vcf,
         pofo_scores,
         pofo_dmr,
-        Channel.fromPath("${projectDir}/assets/Imprinted_DMR_List_V1.tsv"),
+        channel.fromPath(params.idmr_regions_file, checkIfExists: true),
         bam_files,
     )
 }
