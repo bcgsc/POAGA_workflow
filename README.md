@@ -29,8 +29,8 @@ POAGA is a Nextflow-based bioinformatics pipeline that combines Strand-seq and O
 The pipeline requires an input CSV file with the following columns:
 
 - `patient`: Sample label/identifier
-- `strand_seq_fastq`: Path to folder with Strand-seq FastQ files. Provide either this or `strand_seq_fastq_list`.
-- `strand_seq_fastq_list`: A `;`-separated list of individual Strand-seq FastQ file paths. Takes precedence over `strand_seq_fastq` when provided.
+- `strand_seq_fastq`: Path to folder with Strand-seq FastQ files. Provide either this or `strand_seq_fastq_list`. (Optional, if not provided, strand_seq_fastq_list must be provided)
+- `strand_seq_fastq_list`: A `;`-separated list of individual Strand-seq FastQ file paths. Takes precedence over `strand_seq_fastq` when provided. (Optional, if not provided, strand_seq_fastq must be provided)
 - `clair3_vcf`: Path to Clair3 VCF output for Nanopore data
 - `sniffles2_vcf`: Path to Sniffles2 SV VCF output for Nanopore data
 - `bam`: Path to Nanopore BAM file
