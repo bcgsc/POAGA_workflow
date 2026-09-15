@@ -60,9 +60,11 @@ workflow {
              |
              |Required arguments:
              |  --input_csv             Location of the input CSV file. Each row corresponds to a sample to be processed.
-             |                          The CSV file must have a header with 6 columns:
+             |                          The CSV file must have a header with either 6 or 7 columns:
              |     - patient            Sample label.
-             |     - strand_seq_fastq   Folder with the Strand-seq FastQ files for the sample.
+             |     - strand_seq_fastq   Folder containing Strand-seq FastQ files. Optional if strand_seq_fastq_list is given.
+             |     - strand_seq_fastq_list Optional semicolon-separated list of individual Strand-seq FastQ file paths.
+             |                            Takes precedence when both are supplied.
              |     - clair3_vcf         Clair3 VCF output for the sample's Nanopore data.
              |     - sniffles2_vcf      sniffles2 SV VCF output for the sample's Nanopore data.
              |     - bam                Nanopore BAM file.
@@ -123,7 +125,10 @@ samples_file        : ${params.input_csv}
         .fromPath(params.input_csv)
         .splitCsv(header: true)
         .multiMap { row ->
-            strandseq: tuple(row.patient, row.strand_seq_fastq)
+            def strand_fastq = row.get('strand_seq_fastq')
+            def strand_fastq_list = row.get('strand_seq_fastq_list')
+
+            strandseq: tuple(row.patient, strand_fastq, strand_fastq_list)
             nanopore_vcf: tuple(row.patient, row.clair3_vcf)
             nanopore_sv_vcf: tuple(row.patient, row.sniffles2_vcf)
             nanopore_bam: tuple(row.patient, row.bam, row.bai)
@@ -404,14 +409,27 @@ def check_snp_discordance(patient, discordance_file) {
 }
 
 def build_strandseq_fastq_input(strandseq_input) {
-    // Given the strandseq input with tuples (patient, fastq_folder), find all cell fastq files in
-    // the folder and return a tuple (patient, cell_name, r1_file, r2_file, is_paired) where:
+    // Given the strandseq input with tuples (patient, fastq_folder, fastq_list), find all cell fastq files
+    // and return a tuple (patient, cell_name, r1_file, r2_file, is_paired) where:
     // - cell name: parsed cell name from R1 file
     // - r1_file and r2_file: R1/R2 fastQ files, with R2 possibly missing, for SE libraries.
     // - is_paired: boolean indicating if R2 file exists, which means a PE library.
-    return strandseq_input.flatMap { patient, folder ->
-        // Find all R1 files
-        def r1_files = file("${folder}/*_R1*.fastq.gz")
+    // The fastq files are sourced from either a folder or a ';'-separated list of files, whichever is provided.
+    return strandseq_input.flatMap { patient, fastq_folder, fastq_list ->
+        def r1_files
+        if (fastq_list?.toString()?.trim()) {
+            // A ';'-separated list of individual fastq file paths was provided.
+            // This branch takes precedence when both inputs are present.
+            def all_files = fastq_list.split(';').collect { it.trim() }.findAll { it }.collect { file(it) }
+            r1_files = all_files.findAll { it.name ==~ /.*_R1.*\.fastq\.gz$/ }
+        }
+        else if (fastq_folder?.toString()?.trim()) {
+            // A folder was provided; glob all R1 files inside it.
+            r1_files = file("${fastq_folder}/*_R1*.fastq.gz")
+        }
+        else {
+            error("No Strand-seq FASTQ input found for patient ${patient}. Provide either strand_seq_fastq or strand_seq_fastq_list.")
+        }
 
         // Create a list of pairs, handling optional R2
         return r1_files.collect { r1_file ->
